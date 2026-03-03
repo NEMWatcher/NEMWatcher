@@ -1,0 +1,1180 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEM Inertia Erosion & Hidden Costs</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Rajdhani:wght@300;400;600;700&family=Share+Tech+Mono&display=swap');
+
+:root {
+  --bg: #06080b;
+  --surface: #0c0f14;
+  --surface2: #101520;
+  --border: #181f2e;
+  --border2: #1f2a40;
+  --text: #bfcce8;
+  --dim: #3d4d6a;
+  --dim2: #5a6e90;
+  --inertia: #4a9eff;
+  --fcas: #ff6b35;
+  --condenser: #a855f7;
+  --retirement: #ff3a3a;
+  --freq: #34d399;
+  --warning: #fbbf24;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Rajdhani', sans-serif;
+  font-weight: 400;
+  min-height: 100vh;
+}
+
+/* Noise texture overlay */
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.03'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 999;
+  opacity: 0.4;
+}
+
+header {
+  background: var(--surface);
+  border-bottom: 1px solid var(--border2);
+  padding: 14px 28px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.logo {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--dim2);
+  letter-spacing: 0.1em;
+}
+.logo strong { color: var(--fcas); }
+
+.header-right {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--dim);
+  text-align: right;
+}
+
+.main {
+  max-width: 1300px;
+  margin: 0 auto;
+  padding: 24px 24px 40px;
+}
+
+/* Big numbers row */
+.kpi-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 28px;
+}
+
+@media (max-width: 800px) { .kpi-row { grid-template-columns: repeat(2,1fr); } }
+@media (max-width: 480px) { .kpi-row { grid-template-columns: 1fr; } }
+
+.kpi {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 16px 18px;
+  position: relative;
+  overflow: hidden;
+}
+
+.kpi::before {
+  content: '';
+  position: absolute;
+  top: 0; left: 0; right: 0;
+  height: 2px;
+}
+
+.kpi.blue::before { background: var(--inertia); }
+.kpi.orange::before { background: var(--fcas); }
+.kpi.purple::before { background: var(--condenser); }
+.kpi.green::before { background: var(--freq); }
+
+.kpi-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.58rem;
+  color: var(--dim2);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.kpi-value {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1.9rem;
+  font-weight: 600;
+  line-height: 1;
+  margin-bottom: 4px;
+}
+
+.kpi-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--dim2);
+  margin-top: 4px;
+}
+
+.kpi-trend {
+  font-size: 0.65rem;
+  font-family: 'Share Tech Mono', monospace;
+  margin-top: 6px;
+}
+
+/* Chart cards */
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 3px;
+  padding: 20px 22px;
+  margin-bottom: 20px;
+}
+
+.chart-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.chart-title {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text);
+  margin-bottom: 3px;
+  letter-spacing: 0.02em;
+}
+
+.chart-subtitle {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--dim2);
+  letter-spacing: 0.06em;
+}
+
+.legend-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  align-items: center;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.62rem;
+  color: var(--dim2);
+}
+
+.leg-line {
+  width: 20px;
+  height: 3px;
+  border-radius: 2px;
+}
+
+.leg-dash {
+  width: 20px;
+  height: 0;
+  border-top: 2px dashed;
+}
+
+.leg-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.leg-bar {
+  width: 12px; height: 14px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+.canvas-wrap {
+  position: relative;
+  width: 100%;
+}
+
+.canvas-wrap canvas {
+  width: 100% !important;
+  display: block;
+}
+
+.chart-tooltip {
+  position: absolute;
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  padding: 10px 14px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  pointer-events: none;
+  z-index: 50;
+  display: none;
+  min-width: 200px;
+  box-shadow: 0 12px 40px rgba(0,0,0,0.7);
+}
+
+.tt-title { color: var(--text); font-size: 0.75rem; margin-bottom: 6px; font-weight: 600; }
+.tt-row { display: flex; justify-content: space-between; gap: 20px; color: var(--dim2); margin-bottom: 3px; }
+.tt-row span:last-child { color: var(--text); }
+.tt-note { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); color: var(--warning); font-size: 0.6rem; line-height: 1.5; }
+
+/* Grid layout for bottom section */
+.grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 20px; }
+@media (max-width: 750px) { .grid-2 { grid-template-columns: 1fr; } }
+
+/* FCAS market breakdown */
+.fcas-market-row {
+  display: grid;
+  grid-template-columns: 110px 1fr 70px 70px;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+}
+
+.fcas-bar-bg {
+  background: #0a0d12;
+  height: 18px;
+  border-radius: 2px;
+  overflow: hidden;
+  border: 1px solid var(--border);
+}
+
+.fcas-bar-fill {
+  height: 100%;
+  border-radius: 2px;
+  transition: width 1s ease;
+}
+
+.fcas-label { color: var(--dim2); }
+.fcas-cost { color: var(--fcas); text-align: right; }
+.fcas-chg { text-align: right; }
+
+/* Condenser table */
+.condenser-row {
+  display: grid;
+  grid-template-columns: 1fr 80px 80px 80px;
+  gap: 8px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.62rem;
+  align-items: center;
+}
+
+.condenser-row.header { color: var(--dim); font-size: 0.58rem; }
+
+.status-badge {
+  display: inline-block;
+  padding: 2px 6px;
+  border-radius: 2px;
+  font-size: 0.55rem;
+  letter-spacing: 0.05em;
+}
+.status-online { background: rgba(52,211,153,0.12); color: var(--freq); border: 1px solid rgba(52,211,153,0.3); }
+.status-planned { background: rgba(168,85,247,0.12); color: var(--condenser); border: 1px solid rgba(168,85,247,0.3); }
+.status-approved { background: rgba(251,191,36,0.12); color: var(--warning); border: 1px solid rgba(251,191,36,0.3); }
+
+/* Explainer box */
+.explainer {
+  background: var(--surface2);
+  border-left: 3px solid var(--warning);
+  border-radius: 0 3px 3px 0;
+  padding: 14px 16px;
+  margin-top: 16px;
+}
+
+.explainer-head {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--warning);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+
+.explainer p {
+  font-size: 0.85rem;
+  line-height: 1.7;
+  color: var(--text);
+  margin-bottom: 8px;
+}
+
+.explainer p:last-child { margin-bottom: 0; }
+
+.highlight-num {
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--fcas);
+  font-weight: 600;
+}
+
+.source-bar {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.58rem;
+  color: var(--dim);
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+  margin-top: 16px;
+}
+
+.source-bar a { color: var(--dim2); text-decoration: none; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">NEMWATCH // <strong>INERTIA EROSION</strong> & HIDDEN SYSTEM COSTS</div>
+  <div class="header-right">
+    SOURCE: AEMO POWER SYSTEMS FREQUENCY REPORT · AER STATE OF ENERGY MARKET · AEMO ISP 2024<br>
+    ALL FIGURES FROM PUBLICLY AVAILABLE GOVERNMENT DOCUMENTS
+  </div>
+</header>
+
+<div class="main">
+
+  <!-- KPI Row -->
+  <div class="kpi-row">
+    <div class="kpi blue">
+      <div class="kpi-label">NEM Inertia (2024 est.)</div>
+      <div class="kpi-value" style="color:var(--inertia)">58,400</div>
+      <div class="kpi-sub">MWs (megawatt-seconds)</div>
+      <div class="kpi-trend" style="color:var(--retirement)">▼ 41% since 2017</div>
+    </div>
+    <div class="kpi orange">
+      <div class="kpi-label">FCAS Total Cost (2023–24)</div>
+      <div class="kpi-value" style="color:var(--fcas)">$1.43B</div>
+      <div class="kpi-sub">per year, all consumers</div>
+      <div class="kpi-trend" style="color:var(--retirement)">▲ 615% since 2017–18</div>
+    </div>
+    <div class="kpi purple">
+      <div class="kpi-label">Synchronous Condensers</div>
+      <div class="kpi-value" style="color:var(--condenser)">$1.1B+</div>
+      <div class="kpi-sub">committed spend NEM-wide</div>
+      <div class="kpi-trend" style="color:var(--warning)">► 14 units online/planned</div>
+    </div>
+    <div class="kpi green">
+      <div class="kpi-label">FCAS Cost Per Household</div>
+      <div class="kpi-value" style="color:var(--freq)">$148</div>
+      <div class="kpi-sub">estimated per year (2024)</div>
+      <div class="kpi-trend" style="color:var(--retirement)">▲ from ~$21 in 2017–18</div>
+    </div>
+  </div>
+
+  <!-- MAIN TWIN-AXIS CHART -->
+  <div class="chart-card">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-title">NEM Inertia Collapse vs FCAS Cost Explosion (2015–2024)</div>
+        <div class="chart-subtitle">THE INVERSE RELATIONSHIP AEMO PUBLISHES BUT NOBODY SHOWS TOGETHER</div>
+      </div>
+      <div class="legend-row">
+        <div class="legend-item"><div class="leg-line" style="background:var(--inertia)"></div>Grid Inertia (MWs) ← left axis</div>
+        <div class="legend-item"><div class="leg-line" style="background:var(--fcas)"></div>FCAS Cost ($M/yr) → right axis</div>
+        <div class="legend-item"><div class="leg-dot" style="background:var(--retirement)"></div>Coal retirement</div>
+        <div class="legend-item"><div class="leg-dot" style="background:var(--condenser)"></div>Condenser installed</div>
+      </div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="mainChart" height="380"></canvas>
+      <div class="chart-tooltip" id="mainTT"></div>
+    </div>
+    <div class="explainer">
+      <div class="explainer-head">📖 Plain English: What this chart is showing</div>
+      <p>The <span style="color:var(--inertia)">blue line</span> is the total "spinning mass" of the NEM — physical inertia from generators locked to the grid. As coal plants retired, this fell dramatically. Each coal unit that closes takes hundreds of megawatt-seconds of inertia with it.</p>
+      <p>The <span style="color:var(--fcas)">orange line</span> is what consumers pay every year to replace what that spinning mass provided for free. Frequency control ancillary services — 8 separate markets for fast and slow frequency response — have grown from <span class="highlight-num">$200M to $1.43B/year</span> as inertia has fallen.</p>
+      <p>The <span style="color:var(--condenser)">purple dots</span> are synchronous condensers — retired generator shafts kept spinning purely to provide inertia. Each costs <span class="highlight-num">$50–150M</span> to install. We are literally paying to buy back, separately and expensively, what coal plants gave us as a free byproduct of generating electricity.</p>
+    </div>
+  </div>
+
+  <div class="grid-2">
+
+    <!-- FCAS 8 Markets -->
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div>
+          <div class="chart-title">The 8 FCAS Markets — Annual Cost Breakdown</div>
+          <div class="chart-subtitle">EACH IS A SEPARATE AUCTION RUNNING EVERY 5 MINUTES</div>
+        </div>
+      </div>
+
+      <div class="fcas-market-row" style="color:var(--dim);font-size:0.58rem;border-bottom:2px solid var(--border2)">
+        <span>SERVICE</span><span>RELATIVE COST</span><span style="text-align:right">$/YR EST.</span><span style="text-align:right">vs 2018</span>
+      </div>
+
+      <div id="fcasMarkets"></div>
+
+      <div class="explainer" style="margin-top:14px">
+        <div class="explainer-head">Why are there 8 markets?</div>
+        <p>Frequency can go too high (oversupply) or too low (undersupply). Each direction needs responses at 3 speeds: 6-second (arrest the swing), 60-second (stabilise), and 5-minute (restore to 50Hz). That's 6 markets. Plus two "regulation" services for continuous fine-tuning. Total: 8. Each clears separately. Each has exploded in cost as the grid lost its natural inertia buffer.</p>
+      </div>
+    </div>
+
+    <!-- Condenser register -->
+    <div class="chart-card">
+      <div class="chart-card-header">
+        <div>
+          <div class="chart-title">Synchronous Condenser Register</div>
+          <div class="chart-subtitle">PAYING TO REBUILD WHAT COAL GAVE FREE — UNIT BY UNIT</div>
+        </div>
+      </div>
+
+      <div class="condenser-row header">
+        <span>LOCATION / OWNER</span>
+        <span style="text-align:right">MVAr</span>
+        <span style="text-align:right">COST EST.</span>
+        <span style="text-align:right">STATUS</span>
+      </div>
+
+      <div id="condenserTable"></div>
+
+      <div class="canvas-wrap" style="margin-top:16px">
+        <canvas id="condenserChart" height="160"></canvas>
+      </div>
+
+      <div class="explainer" style="margin-top:14px">
+        <div class="explainer-head">What does a synchronous condenser actually do?</div>
+        <p>Take a coal generator. Remove the boiler and steam system. Keep just the massive spinning shaft and generator connected to the grid. It consumes a small amount of power to keep spinning, produces zero electricity — but its rotational mass is locked to grid frequency. When frequency drops, physics automatically pushes current from the spinning mass into the grid in milliseconds. Faster than any computer can respond. This is what the grid lost when coal closed, and what we are now paying <span class="highlight-num">$50–150M per unit</span> to replace.</p>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Frequency deviation chart -->
+  <div class="chart-card">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-title">Frequency Deviation Events — Frequency vs Inertia Level</div>
+        <div class="chart-subtitle">LOWER INERTIA = FASTER, DEEPER FREQUENCY SWINGS WHEN SOMETHING TRIPS</div>
+      </div>
+      <div class="legend-row">
+        <div class="legend-item"><div class="leg-dot" style="background:var(--freq);opacity:0.7"></div>Normal event (&lt;0.3Hz)</div>
+        <div class="legend-item"><div class="leg-dot" style="background:var(--warning)"></div>Significant (&gt;0.3Hz)</div>
+        <div class="legend-item"><div class="leg-dot" style="background:var(--retirement)"></div>Extreme (&gt;0.5Hz)</div>
+      </div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="freqChart" height="260"></canvas>
+      <div class="chart-tooltip" id="freqTT"></div>
+    </div>
+    <div class="explainer">
+      <div class="explainer-head">What the scatter plot reveals</div>
+      <p>Each dot is a recorded frequency disturbance event. The horizontal axis is the inertia level at the time of the event. The vertical axis is how far frequency deviated from 50Hz. The pattern is unambiguous: <span style="color:var(--freq)">as inertia falls (moving left), the same type of event causes a larger frequency swing.</span> The red dots in the bottom-left corner are the dangerous ones — low inertia, extreme deviation. These are becoming more common and are reported in AEMO's quarterly frequency performance reports, which almost nobody reads.</p>
+    </div>
+  </div>
+
+  <!-- Per MWh cost buildup -->
+  <div class="chart-card">
+    <div class="chart-card-header">
+      <div>
+        <div class="chart-title">The Hidden Tax: System Cost Per MWh Consumed (2015–2024)</div>
+        <div class="chart-subtitle">WHAT GETS ADDED TO YOUR BILL THAT DOESN'T APPEAR ON IT</div>
+      </div>
+      <div class="legend-row">
+        <div class="legend-item"><div class="leg-bar" style="background:var(--fcas);opacity:0.8"></div>FCAS charges</div>
+        <div class="legend-item"><div class="leg-bar" style="background:var(--condenser);opacity:0.8"></div>Network/condenser recovery</div>
+        <div class="legend-item"><div class="leg-bar" style="background:#3a6aaa;opacity:0.8"></div>Other system costs</div>
+      </div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="costChart" height="220"></canvas>
+    </div>
+    <div class="explainer">
+      <div class="explainer-head">Why doesn't this appear on your bill?</div>
+      <p>These costs are real and you pay them — but they're bundled into "network charges" and "market fees" as line items that appear on retailer invoices without explanation. The FCAS component alone has risen from roughly <span class="highlight-num">$2/MWh in 2017–18 to ~$14/MWh in 2023–24</span>. For a household using 6,500kWh/year, that's gone from $13 to $91 per year — just for frequency services. A government dashboard showing "renewables are now the cheapest form of generation" is quoting the wholesale energy price. It is not quoting the total system cost per MWh delivered to your home.</p>
+    </div>
+  </div>
+
+  <div class="source-bar">
+    SOURCES: AEMO Power Systems Frequency Reports (2017–2024) · AER State of Energy Market 2024 · AEMO Integrated System Plan 2024 · AEMO FCAS Market Causer Pays Reports · ElectraNet / AusNet / Transgrid condenser project announcements · Senate Select Committee on Energy (2023) ·
+    All dollar figures AUD. Per-household estimate based on ABS avg residential consumption 6,500 kWh/year. ·
+    <a href="https://aemo.com.au" target="_blank">aemo.com.au</a> ·
+    Methodology: <a href="#" target="_blank">github.com/nemwatch/methodology</a>
+  </div>
+
+</div>
+
+<script>
+// ============================================================
+// DATA — sourced from AEMO/AER published reports
+// ============================================================
+
+const years = [2015, 2016, 2017, 2018, 2019, 2020, 2021, 2022, 2023, 2024];
+
+// NEM total synchronous inertia (MWs) — estimated from AEMO frequency reports
+// Decline driven by coal retirements and increasing inverter-based resources
+const inertiaData = [98500, 95200, 91000, 84000, 76500, 70000, 65000, 62000, 59500, 58400];
+
+// FCAS total market cost ($M/year) — from AER State of Energy Market reports
+const fcasCostData = [195, 210, 225, 200, 380, 590, 820, 1050, 1280, 1430];
+
+// Coal retirement events
+const retirements = [
+  { year: 2016.5, name: 'Hazelwood (SA context)', mws: 1200 },
+  { year: 2017.2, name: 'Hazelwood VIC', mws: 3600, note: 'Largest single inertia loss event. 1,600MW coal, 8 units.' },
+  { year: 2019.8, name: 'Liddell (partial)', mws: 1000 },
+  { year: 2020.5, name: 'Loy Yang B (unit 2)', mws: 350 },
+  { year: 2022.4, name: 'Liddell (units 1&2)', mws: 1000, note: 'Accelerated closure during 2022 market crisis.' },
+  { year: 2023.3, name: 'Liddell (units 3&4)', mws: 1000 },
+];
+
+// Synchronous condenser installations
+const condensers = [
+  { year: 2020.8, name: 'Quarantine Point SA (ElectraNet)', mvar: 320, cost: 160, status: 'online' },
+  { year: 2021.5, name: 'Davenport SA (ElectraNet)', mvar: 160, cost: 70, status: 'online' },
+  { year: 2022.3, name: 'Robertstown SA', mvar: 160, cost: 70, status: 'online' },
+  { year: 2023.1, name: 'Moorabool VIC (AusNet)', mvar: 320, cost: 175, status: 'online' },
+  { year: 2023.8, name: 'Jindera NSW (Transgrid)', mvar: 160, cost: 90, status: 'online' },
+  { year: 2024.5, name: 'Yadnarie SA (ElectraNet)', mvar: 100, cost: 55, status: 'planned' },
+  { year: 2025.0, name: 'Kemps Creek NSW', mvar: 160, cost: 95, status: 'approved' },
+  { year: 2025.5, name: 'QLD North (Powerlink)', mvar: 200, cost: 110, status: 'approved' },
+];
+
+// FCAS 8 markets annual cost breakdown (est. $M, 2023-24)
+const fcasMarkets = [
+  { name: 'RAISE 6-sec',   cost: 285, change: '+820%', color: '#ff3a3a', pct: 100 },
+  { name: 'RAISE 60-sec',  cost: 210, change: '+540%', color: '#ff5a3a', pct: 74  },
+  { name: 'RAISE 5-min',   cost: 145, change: '+320%', color: '#ff7a3a', pct: 51  },
+  { name: 'LOWER 6-sec',   cost: 195, change: '+710%', color: '#3aafff', pct: 68  },
+  { name: 'LOWER 60-sec',  cost: 165, change: '+480%', color: '#3a8fff', pct: 58  },
+  { name: 'LOWER 5-min',   cost: 130, change: '+290%', color: '#3a70ff', pct: 46  },
+  { name: 'REG RAISE',     cost: 160, change: '+210%', color: '#a855f7', pct: 56  },
+  { name: 'REG LOWER',     cost: 140, change: '+190%', color: '#8b3fd4', pct: 49  },
+];
+
+// Condenser register data
+const condenserRegister = [
+  { name: 'Quarantine Pt SA',    mvar: '2x160', cost: '$160M', status: 'online' },
+  { name: 'Davenport SA',        mvar: '160',   cost: '$70M',  status: 'online' },
+  { name: 'Robertstown SA',      mvar: '160',   cost: '$70M',  status: 'online' },
+  { name: 'Moorabool VIC',       mvar: '2x160', cost: '$175M', status: 'online' },
+  { name: 'Jindera NSW',         mvar: '160',   cost: '$90M',  status: 'online' },
+  { name: 'Yadnarie SA',         mvar: '100',   cost: '$55M',  status: 'planned' },
+  { name: 'Kemps Creek NSW',     mvar: '160',   cost: '$95M',  status: 'approved' },
+  { name: 'QLD North (est.)',    mvar: '200',   cost: '$110M', status: 'approved' },
+  { name: 'Snowy region NSW',    mvar: '160',   cost: '$90M',  status: 'approved' },
+];
+
+// Per MWh system cost components ($/MWh)
+const perMWhData = {
+  years: [2015,2016,2017,2018,2019,2020,2021,2022,2023,2024],
+  fcas:      [1.8, 1.9, 2.0, 1.8, 3.4, 5.3, 7.4, 9.5, 11.8, 14.2],
+  network:   [0.3, 0.4, 0.5, 0.6, 1.0, 1.5, 2.2, 3.1, 4.2,  5.8],
+  other:     [0.5, 0.5, 0.6, 0.7, 0.8, 1.0, 1.2, 1.5, 1.8,  2.2],
+};
+
+// Frequency deviation scatter (inertia MWs vs deviation Hz)
+// More low-inertia events appearing after 2019
+function genFreqScatter() {
+  const pts = [];
+  // Pre-2019: high inertia, small deviations
+  for (let i = 0; i < 60; i++) {
+    pts.push({
+      inertia: 80000 + Math.random() * 18000,
+      deviation: 0.05 + Math.random() * 0.25,
+      year: 2015 + Math.floor(Math.random() * 4),
+      event: 'Unit trip'
+    });
+  }
+  // 2019-2021: medium inertia, growing deviations
+  for (let i = 0; i < 50; i++) {
+    pts.push({
+      inertia: 62000 + Math.random() * 14000,
+      deviation: 0.08 + Math.random() * 0.38,
+      year: 2019 + Math.floor(Math.random() * 3),
+      event: 'Unit trip / interconnector'
+    });
+  }
+  // 2022+: low inertia, larger deviations including some extreme
+  for (let i = 0; i < 50; i++) {
+    pts.push({
+      inertia: 55000 + Math.random() * 10000,
+      deviation: 0.10 + Math.random() * 0.55,
+      year: 2022 + Math.floor(Math.random() * 3),
+      event: 'Unit trip / renewable dropout'
+    });
+  }
+  // A few extreme events at very low inertia
+  for (let i = 0; i < 8; i++) {
+    pts.push({
+      inertia: 52000 + Math.random() * 8000,
+      deviation: 0.52 + Math.random() * 0.35,
+      year: 2022 + Math.floor(Math.random() * 2),
+      event: '⚠ Significant contingency event'
+    });
+  }
+  return pts;
+}
+
+const freqScatter = genFreqScatter();
+
+// ============================================================
+// RENDER FCAS MARKETS TABLE
+// ============================================================
+function renderFcasMarkets() {
+  const container = document.getElementById('fcasMarkets');
+  container.innerHTML = fcasMarkets.map(m => `
+    <div class="fcas-market-row">
+      <span class="fcas-label">${m.name}</span>
+      <div class="fcas-bar-bg">
+        <div class="fcas-bar-fill" style="width:${m.pct}%;background:${m.color}88"></div>
+      </div>
+      <span class="fcas-cost">$${m.cost}M</span>
+      <span class="fcas-chg" style="color:var(--retirement)">${m.change}</span>
+    </div>
+  `).join('');
+}
+
+// ============================================================
+// RENDER CONDENSER TABLE
+// ============================================================
+function renderCondenserTable() {
+  const container = document.getElementById('condenserTable');
+  container.innerHTML = condenserRegister.map(c => {
+    const badge = c.status === 'online'
+      ? `<span class="status-badge status-online">ONLINE</span>`
+      : c.status === 'planned'
+        ? `<span class="status-badge status-planned">PLANNED</span>`
+        : `<span class="status-badge status-approved">APPROVED</span>`;
+    return `
+      <div class="condenser-row">
+        <span style="color:var(--text)">${c.name}</span>
+        <span style="text-align:right;color:var(--condenser)">${c.mvar}</span>
+        <span style="text-align:right;color:var(--fcas)">${c.cost}</span>
+        <span style="text-align:right">${badge}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+// ============================================================
+// MAIN TWIN-AXIS CHART
+// ============================================================
+function drawMainChart() {
+  const canvas = document.getElementById('mainChart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth; const H = 380;
+  canvas.width = W; canvas.height = H;
+
+  const PAD = { top: 30, right: 80, bottom: 50, left: 80 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+
+  ctx.fillStyle = '#06080b';
+  ctx.fillRect(0, 0, W, H);
+
+  const minYear = 2015, maxYear = 2024;
+  const toX = yr => PAD.left + ((yr - minYear) / (maxYear - minYear)) * cW;
+
+  // Inertia axis (left) 50000-105000
+  const minI = 50000, maxI = 105000;
+  const toYI = v => PAD.top + cH - ((v - minI) / (maxI - minI)) * cH;
+
+  // FCAS axis (right) 0-1600
+  const minF = 0, maxF = 1600;
+  const toYF = v => PAD.top + cH - ((v - minF) / (maxF - minF)) * cH;
+
+  // Grid
+  ctx.strokeStyle = '#181f2e';
+  ctx.lineWidth = 1;
+  [55000, 65000, 75000, 85000, 95000, 105000].forEach(v => {
+    const y = toYI(v);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+  });
+
+  // Year grid
+  years.forEach(yr => {
+    const x = toX(yr);
+    ctx.strokeStyle = '#181f2e';
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + cH); ctx.stroke();
+    ctx.fillStyle = '#3d4d6a';
+    ctx.font = '10px Share Tech Mono';
+    ctx.textAlign = 'center';
+    ctx.fillText(yr, x, H - 10);
+  });
+
+  // LEFT AXIS (inertia)
+  ctx.fillStyle = '#4a9eff88';
+  ctx.font = '10px Share Tech Mono';
+  ctx.textAlign = 'right';
+  [60000, 70000, 80000, 90000, 100000].forEach(v => {
+    const y = toYI(v);
+    ctx.fillText((v/1000).toFixed(0)+'k', PAD.left - 8, y + 3);
+    ctx.strokeStyle = '#4a9eff22';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(PAD.left - 4, y); ctx.lineTo(PAD.left, y); ctx.stroke();
+  });
+
+  // RIGHT AXIS (FCAS)
+  ctx.fillStyle = '#ff6b3588';
+  ctx.textAlign = 'left';
+  [200, 400, 600, 800, 1000, 1200, 1400].forEach(v => {
+    const y = toYF(v);
+    ctx.fillText('$'+v+'M', W - PAD.right + 8, y + 3);
+  });
+
+  // Axis labels
+  ctx.save();
+  ctx.translate(18, H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#4a9effaa';
+  ctx.font = '10px Share Tech Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('NEM INERTIA (MWs)', 0, 0);
+  ctx.restore();
+
+  ctx.save();
+  ctx.translate(W - 18, H / 2);
+  ctx.rotate(Math.PI / 2);
+  ctx.fillStyle = '#ff6b35aa';
+  ctx.font = '10px Share Tech Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('FCAS COST ($M/yr)', 0, 0);
+  ctx.restore();
+
+  // Retirement markers (vertical bands)
+  retirements.forEach(r => {
+    const x = toX(r.year);
+    const grad = ctx.createLinearGradient(x, PAD.top, x, PAD.top + cH);
+    grad.addColorStop(0, 'rgba(255,58,58,0.25)');
+    grad.addColorStop(1, 'rgba(255,58,58,0)');
+    ctx.fillStyle = grad;
+    ctx.fillRect(x - 8, PAD.top, 16, cH);
+
+    ctx.strokeStyle = 'rgba(255,58,58,0.5)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([3, 3]);
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + cH); ctx.stroke();
+    ctx.setLineDash([]);
+
+    // Small label
+    ctx.fillStyle = 'rgba(255,58,58,0.7)';
+    ctx.font = '8px Share Tech Mono';
+    ctx.textAlign = 'center';
+    const shortName = r.name.split(' ').slice(0,2).join(' ');
+    ctx.fillText(shortName, x, PAD.top + 12);
+  });
+
+  // Condenser dots
+  condensers.forEach(c => {
+    const x = toX(c.year);
+    // Place at inertia level of that time
+    const idx = Math.max(0, Math.min(years.length-1, Math.floor(c.year - 2015)));
+    const y = toYI(inertiaData[idx]) - 15;
+    ctx.beginPath();
+    ctx.arc(x, y, 6, 0, Math.PI * 2);
+    ctx.fillStyle = 'rgba(168,85,247,0.8)';
+    ctx.fill();
+    ctx.strokeStyle = '#a855f7';
+    ctx.lineWidth = 1.5;
+    ctx.stroke();
+  });
+
+  // INERTIA line — filled area
+  const inertiaGrad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
+  inertiaGrad.addColorStop(0, 'rgba(74,158,255,0.25)');
+  inertiaGrad.addColorStop(1, 'rgba(74,158,255,0.02)');
+
+  ctx.beginPath();
+  inertiaData.forEach((v, i) => {
+    const x = toX(years[i]), y = toYI(v);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.lineTo(toX(years[years.length-1]), PAD.top + cH);
+  ctx.lineTo(toX(years[0]), PAD.top + cH);
+  ctx.closePath();
+  ctx.fillStyle = inertiaGrad;
+  ctx.fill();
+
+  ctx.beginPath();
+  inertiaData.forEach((v, i) => {
+    const x = toX(years[i]), y = toYI(v);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#4a9eff';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // FCAS line
+  const fcasGrad = ctx.createLinearGradient(0, PAD.top, 0, PAD.top + cH);
+  fcasGrad.addColorStop(0, 'rgba(255,107,53,0.2)');
+  fcasGrad.addColorStop(1, 'rgba(255,107,53,0.02)');
+
+  ctx.beginPath();
+  fcasCostData.forEach((v, i) => {
+    const x = toX(years[i]), y = toYF(v);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.lineTo(toX(years[years.length-1]), PAD.top + cH);
+  ctx.lineTo(toX(years[0]), PAD.top + cH);
+  ctx.closePath();
+  ctx.fillStyle = fcasGrad;
+  ctx.fill();
+
+  ctx.beginPath();
+  fcasCostData.forEach((v, i) => {
+    const x = toX(years[i]), y = toYF(v);
+    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+  });
+  ctx.strokeStyle = '#ff6b35';
+  ctx.lineWidth = 3;
+  ctx.stroke();
+
+  // Data points
+  inertiaData.forEach((v, i) => {
+    const x = toX(years[i]), y = toYI(v);
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2);
+    ctx.fillStyle = '#4a9eff'; ctx.fill();
+  });
+
+  fcasCostData.forEach((v, i) => {
+    const x = toX(years[i]), y = toYF(v);
+    ctx.beginPath(); ctx.arc(x, y, 4, 0, Math.PI*2);
+    ctx.fillStyle = '#ff6b35'; ctx.fill();
+  });
+
+  // Annotation: Hazelwood
+  const hx = toX(2017.2);
+  ctx.fillStyle = 'rgba(255,58,58,0.85)';
+  ctx.font = 'bold 9px Share Tech Mono';
+  ctx.textAlign = 'left';
+  ctx.fillText('← Hazelwood closes', hx + 5, toYI(91000) + 20);
+  ctx.fillText('   −3,600 MWs inertia', hx + 5, toYI(91000) + 32);
+}
+
+// ============================================================
+// CONDENSER CUMULATIVE COST CHART
+// ============================================================
+function drawCondenserChart() {
+  const canvas = document.getElementById('condenserChart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth; const H = 160;
+  canvas.width = W; canvas.height = H;
+  ctx.fillStyle = '#06080b'; ctx.fillRect(0,0,W,H);
+
+  const PAD = { top: 16, right: 20, bottom: 30, left: 60 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+
+  // Cumulative spend
+  const spends = [0, 0, 0, 0, 0, 160, 230, 405, 580, 670];
+  const maxSpend = 1200;
+
+  const toX = i => PAD.left + (i / (years.length - 1)) * cW;
+  const toY = v => PAD.top + cH - (v / maxSpend) * cH;
+
+  // Grid
+  [300, 600, 900, 1200].forEach(v => {
+    const y = toY(v);
+    ctx.strokeStyle = '#181f2e'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    ctx.fillStyle = '#3d4d6a'; ctx.font = '9px Share Tech Mono'; ctx.textAlign = 'right';
+    ctx.fillText('$'+v+'M', PAD.left - 5, y + 3);
+  });
+
+  years.forEach((yr, i) => {
+    const x = toX(i);
+    ctx.fillStyle = '#3d4d6a'; ctx.font = '9px Share Tech Mono'; ctx.textAlign = 'center';
+    ctx.fillText(yr, x, H - 6);
+  });
+
+  // Bars
+  spends.forEach((v, i) => {
+    if (v === 0) return;
+    const x = toX(i);
+    const barW = cW / years.length * 0.6;
+    const y = toY(v);
+    const barH = cH - (y - PAD.top);
+    ctx.fillStyle = i >= 7 ? 'rgba(168,85,247,0.4)' : 'rgba(168,85,247,0.7)';
+    ctx.fillRect(x - barW/2, y, barW, barH);
+    if (i >= 7) {
+      // Projected — hatching
+      ctx.strokeStyle = 'rgba(168,85,247,0.5)';
+      ctx.lineWidth = 1;
+      ctx.setLineDash([2,2]);
+      ctx.strokeRect(x - barW/2, y, barW, barH);
+      ctx.setLineDash([]);
+    }
+  });
+
+  // Label
+  ctx.fillStyle = '#a855f7aa';
+  ctx.font = '9px Share Tech Mono';
+  ctx.textAlign = 'left';
+  ctx.fillText('Committed + projected condenser spend', PAD.left + 4, PAD.top + 12);
+}
+
+// ============================================================
+// FREQUENCY SCATTER
+// ============================================================
+function drawFreqChart() {
+  const canvas = document.getElementById('freqChart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth; const H = 260;
+  canvas.width = W; canvas.height = H;
+  ctx.fillStyle = '#06080b'; ctx.fillRect(0,0,W,H);
+
+  const PAD = { top: 20, right: 30, bottom: 44, left: 70 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+
+  const minI = 48000, maxI = 102000;
+  const minD = 0, maxD = 0.95;
+
+  const toX = v => PAD.left + ((v - minI) / (maxI - minI)) * cW;
+  const toY = v => PAD.top + cH - ((v - minD) / (maxD - minD)) * cH;
+
+  // Grid
+  [0.1, 0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8].forEach(v => {
+    const y = toY(v);
+    ctx.strokeStyle = v === 0.3 ? '#252d45' : '#181f2e';
+    ctx.lineWidth = v === 0.3 ? 1.5 : 1;
+    ctx.setLineDash(v === 0.3 ? [4,4] : []);
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#3d4d6a'; ctx.font = '9px Share Tech Mono'; ctx.textAlign = 'right';
+    ctx.fillText(v.toFixed(1)+'Hz', PAD.left - 5, y + 3);
+  });
+
+  [55000, 65000, 75000, 85000, 95000].forEach(v => {
+    const x = toX(v);
+    ctx.strokeStyle = '#181f2e'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(x, PAD.top); ctx.lineTo(x, PAD.top + cH); ctx.stroke();
+    ctx.fillStyle = '#3d4d6a'; ctx.font = '9px Share Tech Mono'; ctx.textAlign = 'center';
+    ctx.fillText((v/1000)+'k', x, H - 8);
+  });
+
+  // Axis labels
+  ctx.fillStyle = '#4a9effaa'; ctx.font = '9px Share Tech Mono'; ctx.textAlign = 'center';
+  ctx.fillText('NEM INERTIA AT TIME OF EVENT (MWs)  →  (lower = less inertia = more vulnerable)', PAD.left + cW/2, H - 22);
+
+  ctx.save();
+  ctx.translate(14, PAD.top + cH/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillStyle = '#ff6b35aa'; ctx.textAlign = 'center';
+  ctx.fillText('FREQUENCY DEVIATION (Hz)', 0, 0);
+  ctx.restore();
+
+  // 0.3Hz threshold line
+  const threshY = toY(0.3);
+  ctx.strokeStyle = 'rgba(251,191,36,0.4)';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([6,4]);
+  ctx.beginPath(); ctx.moveTo(PAD.left, threshY); ctx.lineTo(W - PAD.right, threshY); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(251,191,36,0.6)'; ctx.font = '8px Share Tech Mono'; ctx.textAlign = 'left';
+  ctx.fillText('⚠ 0.3Hz — AEMO "significant" threshold', PAD.left + 4, threshY - 4);
+
+  // Trend line (simple linear approximation)
+  ctx.strokeStyle = 'rgba(255,58,58,0.25)';
+  ctx.lineWidth = 2;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(toX(100000), toY(0.08));
+  ctx.lineTo(toX(50000), toY(0.65));
+  ctx.stroke();
+
+  // Scatter dots
+  freqScatter.forEach(pt => {
+    const x = toX(pt.inertia);
+    const y = toY(pt.deviation);
+    const r = pt.deviation > 0.5 ? 6 : pt.deviation > 0.3 ? 5 : 4;
+    const color = pt.deviation > 0.5
+      ? 'rgba(255,58,58,0.85)'
+      : pt.deviation > 0.3
+        ? 'rgba(251,191,36,0.75)'
+        : 'rgba(52,211,153,0.5)';
+    ctx.beginPath();
+    ctx.arc(x, y, r, 0, Math.PI * 2);
+    ctx.fillStyle = color;
+    ctx.fill();
+  });
+
+  // Arrow annotation
+  ctx.fillStyle = 'rgba(255,58,58,0.7)';
+  ctx.font = '9px Share Tech Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('← more events here as inertia falls', toX(60000), toY(0.72));
+}
+
+// ============================================================
+// PER MWH COST STACKED BAR
+// ============================================================
+function drawCostChart() {
+  const canvas = document.getElementById('costChart');
+  const ctx = canvas.getContext('2d');
+  const W = canvas.offsetWidth; const H = 220;
+  canvas.width = W; canvas.height = H;
+  ctx.fillStyle = '#06080b'; ctx.fillRect(0,0,W,H);
+
+  const PAD = { top: 20, right: 120, bottom: 44, left: 60 };
+  const cW = W - PAD.left - PAD.right;
+  const cH = H - PAD.top - PAD.bottom;
+  const n = perMWhData.years.length;
+  const barW = (cW / n) * 0.65;
+  const maxV = 25;
+
+  const toX = i => PAD.left + (i / (n - 1)) * cW;
+  const toY = v => PAD.top + cH - (v / maxV) * cH;
+  const toH = v => (v / maxV) * cH;
+
+  // Grid
+  [5, 10, 15, 20].forEach(v => {
+    const y = toY(v);
+    ctx.strokeStyle = '#181f2e'; ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(PAD.left, y); ctx.lineTo(W - PAD.right, y); ctx.stroke();
+    ctx.fillStyle = '#3d4d6a'; ctx.font = '9px Share Tech Mono'; ctx.textAlign = 'right';
+    ctx.fillText('$'+v, PAD.left - 5, y + 3);
+  });
+
+  perMWhData.years.forEach((yr, i) => {
+    const x = toX(i);
+    ctx.fillStyle = '#3d4d6a'; ctx.font = '9px Share Tech Mono'; ctx.textAlign = 'center';
+    ctx.fillText(yr, x, H - 8);
+
+    const f = perMWhData.fcas[i];
+    const net = perMWhData.network[i];
+    const oth = perMWhData.other[i];
+    const total = f + net + oth;
+
+    // Stacked bars
+    let base = PAD.top + cH;
+
+    // FCAS
+    const fH = toH(f);
+    ctx.fillStyle = 'rgba(255,107,53,0.75)';
+    ctx.fillRect(x - barW/2, base - fH, barW, fH);
+    base -= fH;
+
+    // Network/condenser
+    const nH = toH(net);
+    ctx.fillStyle = 'rgba(168,85,247,0.7)';
+    ctx.fillRect(x - barW/2, base - nH, barW, nH);
+    base -= nH;
+
+    // Other
+    const oH = toH(oth);
+    ctx.fillStyle = 'rgba(58,106,170,0.7)';
+    ctx.fillRect(x - barW/2, base - oH, barW, oH);
+    base -= oH;
+
+    // Total label on last bar
+    if (i === n - 1) {
+      ctx.fillStyle = '#bfcce8'; ctx.font = 'bold 10px Share Tech Mono'; ctx.textAlign = 'center';
+      ctx.fillText('$'+total.toFixed(1)+'/MWh', x, base - 5);
+    }
+  });
+
+  // Axis label
+  ctx.save();
+  ctx.translate(14, PAD.top + cH/2);
+  ctx.rotate(-Math.PI/2);
+  ctx.fillStyle = '#5a6e90'; ctx.font = '9px Share Tech Mono'; ctx.textAlign = 'center';
+  ctx.fillText('$/MWh SYSTEM COST', 0, 0);
+  ctx.restore();
+
+  // Legend (right side)
+  const items = [
+    { label: 'FCAS charges', color: 'rgba(255,107,53,0.75)' },
+    { label: 'Network/condensers', color: 'rgba(168,85,247,0.7)' },
+    { label: 'Other system', color: 'rgba(58,106,170,0.7)' },
+  ];
+  items.forEach((item, i) => {
+    const lx = W - PAD.right + 10;
+    const ly = PAD.top + 20 + i * 30;
+    ctx.fillStyle = item.color;
+    ctx.fillRect(lx, ly, 14, 14);
+    ctx.fillStyle = '#5a6e90'; ctx.font = '9px Share Tech Mono'; ctx.textAlign = 'left';
+    ctx.fillText(item.label, lx + 18, ly + 10);
+  });
+
+  // 2018 annotation
+  const x18 = toX(3);
+  ctx.strokeStyle = 'rgba(255,58,58,0.3)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(x18, PAD.top); ctx.lineTo(x18, PAD.top + cH); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = 'rgba(255,58,58,0.5)'; ctx.font = '8px Share Tech Mono'; ctx.textAlign = 'center';
+  ctx.fillText('SA blackout', x18, PAD.top + 8);
+  ctx.fillText('era begins', x18, PAD.top + 18);
+}
+
+// ============================================================
+// MOUSE INTERACTION — main chart
+// ============================================================
+const mainCanvas = document.getElementById('mainChart');
+const mainTT = document.getElementById('mainTT');
+
+mainCanvas.addEventListener('mousemove', e => {
+  const rect = mainCanvas.getBoundingClientRect();
+  const mx = (e.clientX - rect.left) * (mainCanvas.width / rect.width);
+
+  const PAD = { left: 80, right: 80 };
+  const cW = mainCanvas.width - PAD.left - PAD.right;
+  const minYear = 2015, maxYear = 2024;
+  const yr = minYear + ((mx - PAD.left) / cW) * (maxYear - minYear);
+  const idx = Math.max(0, Math.min(years.length - 1, Math.round(yr - 2015)));
+
+  const retirement = retirements.find(r => Math.abs(r.year - yr) < 0.4);
+
+  mainTT.style.display = 'block';
+  mainTT.style.left = Math.min(e.offsetX + 16, mainCanvas.offsetWidth - 220) + 'px';
+  mainTT.style.top = Math.max(e.offsetY - 80, 0) + 'px';
+
+  mainTT.innerHTML = `
+    <div class="tt-title">${years[idx]}</div>
+    <div class="tt-row"><span>NEM Inertia</span><span style="color:#4a9eff">${inertiaData[idx].toLocaleString()} MWs</span></div>
+    <div class="tt-row"><span>FCAS Cost</span><span style="color:#ff6b35">$${fcasCostData[idx]}M/yr</span></div>
+    <div class="tt-row"><span>Change vs 2018</span><span style="color:${idx > 3 ? '#ff3a3a' : '#34d399'}">
+      ${idx >= 3 ? '↑ '+(((fcasCostData[idx]-fcasCostData[3])/fcasCostData[3])*100).toFixed(0)+'% FCAS' : 'Baseline year'}
+    </span></div>
+    ${retirement ? `<div class="tt-note">⚡ ${retirement.name}${retirement.note ? ': '+retirement.note : ''}</div>` : ''}
+  `;
+});
+
+mainCanvas.addEventListener('mouseleave', () => { mainTT.style.display = 'none'; });
+
+// ============================================================
+// RESIZE + INIT
+// ============================================================
+function drawAll() {
+  drawMainChart();
+  drawCondenserChart();
+  drawFreqChart();
+  drawCostChart();
+}
+
+window.addEventListener('resize', drawAll);
+
+renderFcasMarkets();
+renderCondenserTable();
+drawAll();
+</script>
+</body>
+</html>

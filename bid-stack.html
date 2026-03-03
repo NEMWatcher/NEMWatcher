@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NEM Bid Stack — Merit Order Visualiser</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Barlow:wght@300;400;600;700&display=swap');
+
+:root {
+  --bg: #080a0d;
+  --surface: #0e1117;
+  --surface2: #131720;
+  --border: #1c2235;
+  --border2: #252d45;
+  --text: #c8d4f0;
+  --dim: #4a5578;
+  --dim2: #6b7aa8;
+
+  --coal-black: #5a5f70;
+  --coal-brown: #7a6040;
+  --hydro: #3a7fd4;
+  --wind: #3ab87a;
+  --solar: #d4b83a;
+  --gas-ccgt: #d47a3a;
+  --gas-ocgt: #d43a3a;
+  --battery: #9b3ad4;
+  --demand: #ffffff;
+  --negative: #1a6b4a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: 'Barlow', sans-serif;
+  font-weight: 300;
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Scanline texture */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 2px,
+    rgba(0,0,0,0.03) 2px,
+    rgba(0,0,0,0.03) 4px
+  );
+  pointer-events: none;
+  z-index: 1000;
+}
+
+header {
+  padding: 16px 28px;
+  border-bottom: 1px solid var(--border);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  background: var(--surface);
+}
+
+.logo {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.9rem;
+  color: var(--text);
+  letter-spacing: 0.12em;
+}
+
+.logo em { color: #d43a3a; font-style: normal; }
+
+.header-meta {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--dim2);
+}
+
+.live-dot {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: #3ab87a;
+  animation: blink 2s infinite;
+  display: inline-block;
+  margin-right: 5px;
+}
+
+@keyframes blink {
+  0%,100% { opacity:1; box-shadow: 0 0 6px #3ab87a; }
+  50% { opacity:0.4; box-shadow: none; }
+}
+
+/* Controls bar */
+.controls {
+  background: var(--surface2);
+  border-bottom: 1px solid var(--border);
+  padding: 12px 28px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  flex-wrap: wrap;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.68rem;
+  color: var(--dim2);
+}
+
+.btn {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 5px 14px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  cursor: pointer;
+  letter-spacing: 0.08em;
+  border-radius: 2px;
+  transition: all 0.2s;
+}
+
+.btn:hover, .btn.active {
+  border-color: #d43a3a;
+  color: #d43a3a;
+}
+
+.btn.active { background: rgba(212,58,58,0.08); }
+
+select {
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  color: var(--text);
+  padding: 5px 10px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  border-radius: 2px;
+  cursor: pointer;
+}
+
+/* Main layout */
+.main {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  height: calc(100vh - 110px);
+  min-height: 600px;
+}
+
+@media (max-width: 900px) {
+  .main { grid-template-columns: 1fr; height: auto; }
+  .sidebar { border-left: none; border-top: 1px solid var(--border); }
+}
+
+/* Chart area */
+.chart-area {
+  padding: 24px 28px 16px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.chart-title {
+  font-size: 0.65rem;
+  font-family: 'Share Tech Mono', monospace;
+  color: var(--dim2);
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.spot-price {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 2.6rem;
+  font-weight: 400;
+  line-height: 1;
+  color: var(--text);
+  transition: color 0.5s;
+}
+
+.spot-price.high { color: #d43a3a; }
+.spot-price.medium { color: #d4b83a; }
+.spot-price.low { color: #3ab87a; }
+.spot-price.negative { color: #3a7fd4; }
+
+.price-sub {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  color: var(--dim2);
+  margin-top: 4px;
+}
+
+/* Legend */
+.legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem;
+  color: var(--dim2);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+
+.legend-item:hover { color: var(--text); }
+
+.legend-swatch {
+  width: 12px; height: 12px;
+  border-radius: 1px;
+  flex-shrink: 0;
+}
+
+/* Canvas wrapper */
+.canvas-wrap {
+  flex: 1;
+  position: relative;
+  min-height: 300px;
+}
+
+canvas {
+  position: absolute;
+  inset: 0;
+  width: 100% !important;
+  height: 100% !important;
+}
+
+/* Tooltip */
+.tooltip {
+  position: absolute;
+  background: var(--surface);
+  border: 1px solid var(--border2);
+  border-radius: 3px;
+  padding: 10px 14px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.68rem;
+  pointer-events: none;
+  z-index: 100;
+  display: none;
+  min-width: 180px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6);
+}
+
+.tooltip-name { color: var(--text); font-size: 0.78rem; margin-bottom: 6px; font-weight: 600; }
+.tooltip-row { display: flex; justify-content: space-between; gap: 16px; color: var(--dim2); margin-bottom: 3px; }
+.tooltip-row span:last-child { color: var(--text); }
+.tooltip-note { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); color: #d4b83a; font-size: 0.6rem; line-height: 1.5; }
+
+/* Sidebar */
+.sidebar {
+  border-left: 1px solid var(--border);
+  background: var(--surface);
+  overflow-y: auto;
+  padding: 20px;
+}
+
+.sidebar-section { margin-bottom: 24px; }
+
+.sidebar-label {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--dim);
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 6px;
+}
+
+/* Stack table */
+.stack-row {
+  display: grid;
+  grid-template-columns: 1fr auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  cursor: pointer;
+  transition: background 0.15s;
+  border-radius: 2px;
+  padding-left: 4px;
+}
+
+.stack-row:hover { background: var(--surface2); }
+.stack-row.highlighted { background: rgba(212,58,58,0.08); }
+
+.stack-row-name { color: var(--text); }
+.stack-row-mw { color: var(--dim2); }
+.stack-row-price { font-weight: 600; }
+
+.price-neg { color: #3a7fd4; }
+.price-zero { color: #3ab87a; }
+.price-low { color: #3ab87a; }
+.price-mid { color: #d4b83a; }
+.price-high { color: #d47a3a; }
+.price-vhigh { color: #d43a3a; }
+
+/* Explainer panel */
+.explainer-panel {
+  background: var(--surface2);
+  border: 1px solid var(--border2);
+  border-left: 3px solid #d4b83a;
+  border-radius: 2px;
+  padding: 12px;
+  margin-bottom: 16px;
+}
+
+.explainer-title {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem;
+  color: #d4b83a;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 6px;
+}
+
+.explainer-text {
+  font-size: 0.75rem;
+  line-height: 1.65;
+  color: var(--text);
+}
+
+/* Alert */
+.alert {
+  background: rgba(212,58,58,0.07);
+  border: 1px solid rgba(212,58,58,0.25);
+  border-radius: 2px;
+  padding: 10px 12px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  color: #e07070;
+  margin-bottom: 16px;
+  display: none;
+}
+
+.alert.visible { display: block; }
+
+/* Stats */
+.stat-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 0;
+  border-bottom: 1px solid var(--border);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+}
+
+.stat-label { color: var(--dim2); }
+.stat-val { color: var(--text); }
+
+/* Scenario buttons */
+.scenario-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.scenario-btn {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--dim2);
+  padding: 8px 6px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem;
+  cursor: pointer;
+  border-radius: 2px;
+  text-align: center;
+  transition: all 0.2s;
+  line-height: 1.4;
+}
+
+.scenario-btn:hover { border-color: var(--border2); color: var(--text); }
+.scenario-btn.active { border-color: #d43a3a; color: #d43a3a; background: rgba(212,58,58,0.08); }
+
+.scenario-btn .scenario-price {
+  display: block;
+  font-size: 0.8rem;
+  color: inherit;
+  margin-top: 2px;
+}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">NEM<em>/</em>WATCH — <em>BID STACK</em> // MERIT ORDER DISPATCH</div>
+  <div class="header-meta">
+    <span><span class="live-dot"></span>SIMULATED DATA — NEMWEB FORMAT</span>
+    <span id="clock">--:--:-- AEST</span>
+    <span>5-MIN DISPATCH INTERVAL</span>
+  </div>
+</header>
+
+<div class="controls">
+  <div class="control-group">
+    REGION:
+    <button class="btn active" onclick="setRegion('NEM',this)">NEM</button>
+    <button class="btn" onclick="setRegion('NSW',this)">NSW</button>
+    <button class="btn" onclick="setRegion('VIC',this)">VIC</button>
+    <button class="btn" onclick="setRegion('QLD',this)">QLD</button>
+    <button class="btn" onclick="setRegion('SA',this)">SA</button>
+    <button class="btn" onclick="setRegion('TAS',this)">TAS</button>
+  </div>
+  <div class="control-group">
+    SCENARIO:
+    <select onchange="loadScenario(this.value)" id="scenarioSelect">
+      <option value="current">Current (live sim)</option>
+      <option value="peakEvening">Peak Evening — still night</option>
+      <option value="solarNoon">Solar noon — high RE</option>
+      <option value="negative">Negative price event</option>
+      <option value="marketCap">Price cap event ($15,100)</option>
+    </select>
+  </div>
+  <div class="control-group" style="margin-left:auto">
+    <button class="btn" onclick="toggleAnimate()" id="animBtn">⏸ PAUSE</button>
+    <button class="btn" onclick="toggleLog()" id="logBtn">PRICE LOG</button>
+  </div>
+</div>
+
+<div class="main">
+  <div class="chart-area">
+    <div class="chart-header">
+      <div>
+        <div class="chart-title">Dispatch Offer Stack — Merit Order ($/MWh vs Cumulative MW)</div>
+        <div class="spot-price" id="spotPrice">$142</div>
+        <div class="price-sub" id="priceSub">Spot price set by: <span id="marginalUnit">Torrens Island B (Gas OCGT)</span></div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </div>
+    <div class="canvas-wrap">
+      <canvas id="bidCanvas"></canvas>
+      <div class="tooltip" id="tooltip"></div>
+    </div>
+    <div style="font-family:'Share Tech Mono',monospace;font-size:0.58rem;color:var(--dim);margin-top:8px;text-align:center">
+      HORIZONTAL AXIS: Cumulative generation capacity (MW) &nbsp;|&nbsp; VERTICAL AXIS: Offer price ($/MWh) &nbsp;|&nbsp; VERTICAL LINE: Current demand &nbsp;|&nbsp; INTERSECTION = Spot Price
+    </div>
+  </div>
+
+  <div class="sidebar">
+    <div class="sidebar-section">
+      <div class="alert" id="alertBox"></div>
+
+      <div class="explainer-panel" id="explainerPanel">
+        <div class="explainer-title">📖 What am I looking at?</div>
+        <div class="explainer-text" id="explainerText">
+          Each coloured block is a generator offering MW of capacity at a price. AEMO stacks them cheapest-first (left to right). Where the white demand line crosses the stack sets the spot price — and <em>every generator gets that price</em>, even the ones offering for $0.
+        </div>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Dispatch Summary</div>
+      <div class="stat-row"><span class="stat-label">Total demand</span><span class="stat-val" id="stat-demand">—</span></div>
+      <div class="stat-row"><span class="stat-label">Marginal unit</span><span class="stat-val" id="stat-marginal">—</span></div>
+      <div class="stat-row"><span class="stat-label">Spot price</span><span class="stat-val" id="stat-price">—</span></div>
+      <div class="stat-row"><span class="stat-label">Negative MW (RE)</span><span class="stat-val price-neg" id="stat-neg">—</span></div>
+      <div class="stat-row"><span class="stat-label">Zero-bid MW</span><span class="stat-val price-zero" id="stat-zero">—</span></div>
+      <div class="stat-row"><span class="stat-label">Gas on dispatch</span><span class="stat-val price-high" id="stat-gas">—</span></div>
+      <div class="stat-row"><span class="stat-label">Curtailment risk</span><span class="stat-val" id="stat-curtail">—</span></div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Load Scenarios</div>
+      <div class="scenario-grid">
+        <button class="scenario-btn active" id="sc-current" onclick="loadScenario('current',this)">
+          Live sim<span class="scenario-price" id="sc-price-current">$142</span>
+        </button>
+        <button class="scenario-btn" id="sc-peakEvening" onclick="loadScenario('peakEvening',this)">
+          Peak evening<span class="scenario-price">$2,840</span>
+        </button>
+        <button class="scenario-btn" id="sc-solarNoon" onclick="loadScenario('solarNoon',this)">
+          Solar noon<span class="scenario-price">$28</span>
+        </button>
+        <button class="scenario-btn" id="sc-negative" onclick="loadScenario('negative',this)">
+          Negative price<span class="scenario-price">−$62</span>
+        </button>
+        <button class="scenario-btn" id="sc-marketCap" onclick="loadScenario('marketCap',this)" style="grid-column:span 2">
+          ⚠ Price cap event — $15,100/MWh<span class="scenario-price">$15,100</span>
+        </button>
+      </div>
+    </div>
+
+    <div class="sidebar-section">
+      <div class="sidebar-label">Unit Offers (ranked)</div>
+      <div id="unitTable"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// =============================================
+// DATA — simulates AEMO BIDPEROFFER structure
+// In production: fetch from NEMWeb BIDPEROFFER_{timestamp}.zip
+// =============================================
+
+const FUEL_COLORS = {
+  'Wind':       '#3ab87a',
+  'Solar':      '#d4b83a',
+  'Black Coal': '#5a5f70',
+  'Brown Coal': '#7a6040',
+  'Hydro':      '#3a7fd4',
+  'Gas CCGT':   '#d47a3a',
+  'Gas OCGT':   '#d43a3a',
+  'Battery':    '#9b3ad4',
+  'Pumped Hydro': '#5a9fd4',
+};
+
+const FUEL_LABELS = Object.keys(FUEL_COLORS);
+
+// Each unit: { name, fuel, offers: [{mw, price}] }
+const scenarios = {
+
+  current: {
+    label: 'Current (live sim)',
+    demand: 22840,
+    explainer: 'Typical afternoon dispatch. Gas OCGT units set the marginal price despite producing far less than coal and wind. Every generator gets the same spot price.',
+    alert: null,
+    units: [
+      { name: 'Macarthur Wind Farm',   fuel: 'Wind',       offers: [{mw:420, price:-15}, {mw:60, price:0}] },
+      { name: 'Snowtown Wind Farm',    fuel: 'Wind',       offers: [{mw:370, price:-10}, {mw:40, price:5}] },
+      { name: 'Hornsdale Wind Farm',   fuel: 'Wind',       offers: [{mw:310, price:-8}] },
+      { name: 'Bungala Solar',         fuel: 'Solar',      offers: [{mw:220, price:-5}, {mw:100, price:0}] },
+      { name: 'Darlington Point Solar',fuel: 'Solar',      offers: [{mw:280, price:-3}] },
+      { name: 'Vales Point B',         fuel: 'Black Coal', offers: [{mw:600, price:45}, {mw:200, price:60}] },
+      { name: 'Eraring',               fuel: 'Black Coal', offers: [{mw:1400, price:42}, {mw:400, price:58}] },
+      { name: 'Bayswater',             fuel: 'Black Coal', offers: [{mw:1200, price:48}, {mw:400, price:65}] },
+      { name: 'Loy Yang A',            fuel: 'Brown Coal', offers: [{mw:1400, price:38}, {mw:200, price:55}] },
+      { name: 'Yallourn',              fuel: 'Brown Coal', offers: [{mw:800, price:40}] },
+      { name: 'Snowy Tumut 3',         fuel: 'Hydro',      offers: [{mw:600, price:55}, {mw:200, price:80}] },
+      { name: 'Murray (Hydro)',         fuel: 'Hydro',      offers: [{mw:400, price:70}] },
+      { name: 'Callide C',             fuel: 'Black Coal', offers: [{mw:700, price:50}, {mw:100, price:72}] },
+      { name: 'Millmerran',            fuel: 'Black Coal', offers: [{mw:700, price:52}] },
+      { name: 'Origin Mortlake',       fuel: 'Gas CCGT',   offers: [{mw:400, price:95}, {mw:150, price:130}] },
+      { name: 'AGL Somerton',          fuel: 'Gas OCGT',   offers: [{mw:160, price:120}, {mw:80, price:160}] },
+      { name: 'Torrens Island B',      fuel: 'Gas OCGT',   offers: [{mw:80, price:142}, {mw:80, price:300}] },
+      { name: 'Hallet Gas Turbine',    fuel: 'Gas OCGT',   offers: [{mw:80, price:250}, {mw:80, price:800}] },
+      { name: 'Hornsdale BESS',        fuel: 'Battery',    offers: [{mw:50, price:200}, {mw:50, price:500}] },
+      { name: 'Dalrymple BESS',        fuel: 'Battery',    offers: [{mw:30, price:350}] },
+    ]
+  },
+
+  peakEvening: {
+    label: 'Peak Evening — still night',
+    demand: 28600,
+    explainer: '⚠ This is the scenario rarely shown on official dashboards. 6pm winter, no wind, no solar. Coal and gas carry the entire load. Gas OCGTs set the price at $2,840/MWh — legally permitted, and this happens regularly.',
+    alert: '⚠ HIGH STRESS: Gas OCGTs at price cap approach. Reserve margin below threshold. This is what a still winter evening looks like.',
+    units: [
+      { name: 'Macarthur Wind Farm',   fuel: 'Wind',       offers: [{mw:30, price:50}] },   // very low wind
+      { name: 'Snowtown Wind Farm',    fuel: 'Wind',       offers: [{mw:25, price:60}] },
+      { name: 'Vales Point B',         fuel: 'Black Coal', offers: [{mw:650, price:45}, {mw:150, price:62}] },
+      { name: 'Eraring',               fuel: 'Black Coal', offers: [{mw:1600, price:42}, {mw:400, price:60}] },
+      { name: 'Bayswater',             fuel: 'Black Coal', offers: [{mw:1400, price:48}, {mw:400, price:66}] },
+      { name: 'Loy Yang A',            fuel: 'Brown Coal', offers: [{mw:1600, price:38}, {mw:200, price:55}] },
+      { name: 'Yallourn',              fuel: 'Brown Coal', offers: [{mw:850, price:40}] },
+      { name: 'Callide C',             fuel: 'Black Coal', offers: [{mw:800, price:50}, {mw:100, price:72}] },
+      { name: 'Millmerran',            fuel: 'Black Coal', offers: [{mw:780, price:52}] },
+      { name: 'Snowy Tumut 3',         fuel: 'Hydro',      offers: [{mw:1400, price:60}] },
+      { name: 'Murray (Hydro)',         fuel: 'Hydro',      offers: [{mw:800, price:75}] },
+      { name: 'Origin Mortlake',       fuel: 'Gas CCGT',   offers: [{mw:550, price:110}, {mw:150, price:180}] },
+      { name: 'AGL Somerton',          fuel: 'Gas OCGT',   offers: [{mw:200, price:320}, {mw:60, price:900}] },
+      { name: 'Torrens Island B',      fuel: 'Gas OCGT',   offers: [{mw:200, price:1200}, {mw:120, price:2840}] },
+      { name: 'Hallet Gas Turbine',    fuel: 'Gas OCGT',   offers: [{mw:120, price:4500}, {mw:80, price:8000}] },
+      { name: 'Hornsdale BESS',        fuel: 'Battery',    offers: [{mw:100, price:1500}] },
+      { name: 'Dalrymple BESS',        fuel: 'Battery',    offers: [{mw:30, price:3000}] },
+    ]
+  },
+
+  solarNoon: {
+    label: 'Solar noon — high RE penetration',
+    demand: 16200,
+    explainer: 'High solar penetration midday pushes cheap generation far left. Coal and gas are pushed off the merit order entirely, or must offer very low prices to stay on. Prices crash — sometimes making peaker gas unviable, destroying the business case for the backup capacity we need at 6pm.',
+    alert: null,
+    units: [
+      { name: 'Bungala Solar',          fuel: 'Solar',      offers: [{mw:220, price:-40}, {mw:100, price:-10}] },
+      { name: 'Darlington Point Solar', fuel: 'Solar',      offers: [{mw:280, price:-35}] },
+      { name: 'Moree Solar Farm',       fuel: 'Solar',      offers: [{mw:160, price:-30}, {mw:60, price:-5}] },
+      { name: 'Nyngan Solar Plant',     fuel: 'Solar',      offers: [{mw:100, price:-25}] },
+      { name: 'Macarthur Wind Farm',    fuel: 'Wind',       offers: [{mw:420, price:-20}] },
+      { name: 'Snowtown Wind Farm',     fuel: 'Wind',       offers: [{mw:370, price:-15}] },
+      { name: 'Rooftop Solar (agg)',    fuel: 'Solar',      offers: [{mw:5200, price:-50}] }, // rooftop bids negative
+      { name: 'Loy Yang A',            fuel: 'Brown Coal',  offers: [{mw:600, price:28}, {mw:800, price:45}] },
+      { name: 'Yallourn',              fuel: 'Brown Coal',  offers: [{mw:400, price:32}] },
+      { name: 'Vales Point B',         fuel: 'Black Coal',  offers: [{mw:300, price:40}] },
+      { name: 'Snowy Tumut 3',         fuel: 'Hydro',       offers: [{mw:200, price:28}] },
+      { name: 'Eraring',               fuel: 'Black Coal',  offers: [{mw:400, price:38}] },
+      { name: 'Origin Mortlake',       fuel: 'Gas CCGT',    offers: [{mw:0, price:90}] }, // offline/uneconomic
+      { name: 'AGL Somerton',          fuel: 'Gas OCGT',    offers: [{mw:0, price:200}] },
+    ]
+  },
+
+  negative: {
+    label: 'Negative price event',
+    demand: 13800,
+    explainer: 'Negative prices occur when renewables flood the grid during low-demand periods (Sunday morning, mild weather). Generators with REC incentives bid negative to stay dispatched. Network constraints prevent the excess power reaching where it\'s needed — so it\'s either curtailed or exported at a loss. The headline "record renewables" moment is often a negative price event.',
+    alert: '⚠ NEGATIVE PRICE EVENT: Spot price −$62/MWh. Renewables are paying to stay on. Coal operators facing difficult choices — ramping down has startup costs. Curtailment of up to 1,800MW likely.',
+    units: [
+      { name: 'Rooftop Solar (agg)',    fuel: 'Solar',      offers: [{mw:6800, price:-200}] },
+      { name: 'Bungala Solar',          fuel: 'Solar',      offers: [{mw:220, price:-150}, {mw:100, price:-80}] },
+      { name: 'Darlington Point Solar', fuel: 'Solar',      offers: [{mw:280, price:-120}] },
+      { name: 'Macarthur Wind Farm',    fuel: 'Wind',       offers: [{mw:420, price:-90}] },
+      { name: 'Snowtown Wind Farm',     fuel: 'Wind',       offers: [{mw:370, price:-70}] },
+      { name: 'Hornsdale Wind Farm',    fuel: 'Wind',       offers: [{mw:310, price:-62}] },
+      { name: 'Loy Yang A',            fuel: 'Brown Coal',  offers: [{mw:1200, price:-30}] }, // must stay on (startup costs)
+      { name: 'Yallourn',              fuel: 'Brown Coal',  offers: [{mw:600, price:-20}] },
+      { name: 'Snowy Tumut 3',         fuel: 'Hydro',       offers: [{mw:200, price:20}] },
+    ]
+  },
+
+  marketCap: {
+    label: 'Price cap event — $15,100/MWh',
+    demand: 31200,
+    explainer: '⚠ EXTREME EVENT. This reflects the 2022 market conditions when AEMO suspended the market. Extreme heat, multiple coal unit failures, gas shortage. The market price cap ($15,100/MWh = 107× normal) is legally set. At this price, a single 5-minute interval costs consumers millions. These events are becoming more common as dispatchable capacity retires.',
+    alert: '🚨 MARKET STRESS: Approaching price cap. Multiple coal units offline (forced outage). Gas supply constrained. This is a real scenario that occurred in June 2022 — market was suspended for 9 days.',
+    units: [
+      { name: 'Macarthur Wind Farm',   fuel: 'Wind',       offers: [{mw:40, price:100}] },
+      { name: 'Snowtown Wind Farm',    fuel: 'Wind',       offers: [{mw:30, price:120}] },
+      { name: 'Bayswater (2 units)',   fuel: 'Black Coal', offers: [{mw:900, price:80}, {mw:200, price:150}] },
+      { name: 'Eraring (partial)',     fuel: 'Black Coal', offers: [{mw:800, price:90}] }, // other units tripped
+      { name: 'Loy Yang A',           fuel: 'Brown Coal', offers: [{mw:1200, price:75}] },
+      { name: 'Snowy Tumut 3',        fuel: 'Hydro',      offers: [{mw:1400, price:200}] },
+      { name: 'Murray (Hydro)',        fuel: 'Hydro',      offers: [{mw:800, price:350}] },
+      { name: 'Origin Mortlake',      fuel: 'Gas CCGT',   offers: [{mw:300, price:800}, {mw:200, price:2500}] },
+      { name: 'AGL Somerton',         fuel: 'Gas OCGT',   offers: [{mw:160, price:3500}, {mw:80, price:8000}] },
+      { name: 'Torrens Island B',     fuel: 'Gas OCGT',   offers: [{mw:120, price:9000}, {mw:80, price:12000}] },
+      { name: 'Hallet Gas Turbine',   fuel: 'Gas OCGT',   offers: [{mw:80, price:14000}, {mw:60, price:15100}] },
+      { name: 'Hornsdale BESS',       fuel: 'Battery',    offers: [{mw:100, price:15100}] },
+    ]
+  }
+};
+
+// =============================================
+// STATE
+// =============================================
+let currentScenario = 'current';
+let animating = true;
+let animFrame = null;
+let lastDraw = 0;
+let jitterOffset = 0;
+let hoveredUnit = null;
+let priceLog = [];
+let showLog = false;
+
+// =============================================
+// BUILD STACK from scenario
+// =============================================
+function buildStack(scenarioKey) {
+  const sc = scenarios[scenarioKey];
+  const allOffers = [];
+
+  sc.units.forEach(unit => {
+    unit.offers.forEach(offer => {
+      if (offer.mw > 0) {
+        allOffers.push({
+          unit: unit.name,
+          fuel: unit.fuel,
+          mw: offer.mw,
+          price: offer.price,
+          color: FUEL_COLORS[unit.fuel] || '#888'
+        });
+      }
+    });
+  });
+
+  // Sort by price (merit order)
+  allOffers.sort((a, b) => a.price - b.price);
+
+  // Assign cumulative x positions
+  let cumMW = 0;
+  allOffers.forEach(o => {
+    o.xStart = cumMW;
+    o.xEnd = cumMW + o.mw;
+    cumMW += o.mw;
+  });
+
+  return { offers: allOffers, totalMW: cumMW, demand: sc.demand };
+}
+
+// =============================================
+// FIND MARGINAL UNIT (where demand line crosses)
+// =============================================
+function findMarginal(offers, demand) {
+  for (let i = 0; i < offers.length; i++) {
+    if (offers[i].xEnd >= demand) return offers[i];
+  }
+  return offers[offers.length - 1];
+}
+
+// =============================================
+// DRAW
+// =============================================
+const canvas = document.getElementById('bidCanvas');
+const ctx = canvas.getContext('2d');
+const tooltip = document.getElementById('tooltip');
+
+function draw(jitter = 0) {
+  const sc = scenarios[currentScenario];
+  const { offers, totalMW, demand } = buildStack(currentScenario);
+  const marginal = findMarginal(offers, demand + jitter);
+  const spotPrice = marginal.price;
+
+  const W = canvas.offsetWidth;
+  const H = canvas.offsetHeight;
+  canvas.width = W;
+  canvas.height = H;
+
+  const PAD = { top: 36, right: 20, bottom: 40, left: 64 };
+  const chartW = W - PAD.left - PAD.right;
+  const chartH = H - PAD.top - PAD.bottom;
+
+  // Price range
+  const allPrices = offers.map(o => o.price);
+  const minP = Math.min(...allPrices, -80);
+  const maxP = Math.min(Math.max(...allPrices, spotPrice * 1.3), 16000);
+  const priceRange = maxP - minP;
+
+  const toX = mw => PAD.left + (mw / totalMW) * chartW;
+  const toY = price => {
+    // log-ish scale for wide price ranges
+    if (maxP > 500) {
+      const norm = (price - minP) / priceRange;
+      return PAD.top + chartH - norm * chartH;
+    }
+    return PAD.top + chartH - ((price - minP) / priceRange) * chartH;
+  };
+
+  // Background
+  ctx.fillStyle = '#080a0d';
+  ctx.fillRect(0, 0, W, H);
+
+  // Grid lines
+  ctx.strokeStyle = '#1c2235';
+  ctx.lineWidth = 1;
+  const priceSteps = maxP > 5000 ? [0, 1000, 3000, 8000, 15100] :
+                     maxP > 500  ? [0, 100, 300, 500, 800, maxP] :
+                                   [-50, 0, 50, 100, 200, 300];
+
+  priceSteps.forEach(p => {
+    if (p < minP || p > maxP) return;
+    const y = toY(p);
+    ctx.beginPath();
+    ctx.moveTo(PAD.left, y);
+    ctx.lineTo(W - PAD.right, y);
+    ctx.stroke();
+
+    ctx.fillStyle = '#4a5578';
+    ctx.font = '9px Share Tech Mono';
+    ctx.textAlign = 'right';
+    const label = p >= 1000 ? `$${(p/1000).toFixed(0)}k` : `$${p}`;
+    ctx.fillText(label, PAD.left - 6, y + 3);
+  });
+
+  // Zero line
+  if (minP < 0) {
+    const zeroY = toY(0);
+    ctx.strokeStyle = '#2a3550';
+    ctx.lineWidth = 1.5;
+    ctx.setLineDash([4, 4]);
+    ctx.beginPath();
+    ctx.moveTo(PAD.left, zeroY);
+    ctx.lineTo(W - PAD.right, zeroY);
+    ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = '#3a4a70';
+    ctx.font = '9px Share Tech Mono';
+    ctx.textAlign = 'left';
+    ctx.fillText('$0', PAD.left + 4, zeroY - 3);
+  }
+
+  // Draw offer blocks
+  offers.forEach(offer => {
+    const x1 = toX(offer.xStart);
+    const x2 = toX(offer.xEnd);
+    const y = toY(offer.price);
+    const barW = Math.max(1, x2 - x1 - 1);
+
+    const isHovered = hoveredUnit === offer.unit;
+    const isMarginal = offer === marginal;
+
+    // Main bar — from y to bottom of chart
+    const baseY = toY(Math.max(minP, 0));
+
+    ctx.fillStyle = isHovered
+      ? offer.color
+      : isMarginal
+        ? offer.color
+        : offer.color + '99';
+
+    ctx.fillRect(x1, y, barW, baseY - y);
+
+    // Top line highlight
+    ctx.fillStyle = isHovered || isMarginal ? offer.color : offer.color + 'cc';
+    ctx.fillRect(x1, y - 2, barW, 3);
+
+    // Marginal glow
+    if (isMarginal) {
+      ctx.shadowColor = offer.color;
+      ctx.shadowBlur = 12;
+      ctx.fillStyle = offer.color;
+      ctx.fillRect(x1, y - 2, barW, 3);
+      ctx.shadowBlur = 0;
+    }
+  });
+
+  // Demand line (vertical)
+  const demandX = toX(demand + jitter);
+  const grad = ctx.createLinearGradient(demandX, PAD.top, demandX, H - PAD.bottom);
+  grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+  grad.addColorStop(1, 'rgba(255,255,255,0.2)');
+  ctx.strokeStyle = grad;
+  ctx.lineWidth = 2;
+  ctx.setLineDash([]);
+  ctx.beginPath();
+  ctx.moveTo(demandX, PAD.top);
+  ctx.lineTo(demandX, H - PAD.bottom);
+  ctx.stroke();
+
+  // Demand label
+  ctx.fillStyle = 'rgba(255,255,255,0.7)';
+  ctx.font = '9px Share Tech Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('DEMAND', demandX, PAD.top - 8);
+  ctx.fillText(`${Math.round(demand/1000).toFixed(1)}GW`, demandX, PAD.top + 2);
+
+  // Spot price horizontal line
+  const spotY = toY(spotPrice);
+  ctx.strokeStyle = 'rgba(255,255,255,0.5)';
+  ctx.lineWidth = 1;
+  ctx.setLineDash([6, 4]);
+  ctx.beginPath();
+  ctx.moveTo(PAD.left, spotY);
+  ctx.lineTo(demandX, spotY);
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Intersection dot
+  ctx.beginPath();
+  ctx.arc(demandX, spotY, 5, 0, Math.PI * 2);
+  ctx.fillStyle = '#ffffff';
+  ctx.shadowColor = '#ffffff';
+  ctx.shadowBlur = 10;
+  ctx.fill();
+  ctx.shadowBlur = 0;
+
+  // Spot price label at intersection
+  ctx.fillStyle = '#ffffff';
+  ctx.font = 'bold 11px Share Tech Mono';
+  ctx.textAlign = 'left';
+  const priceLabel = spotPrice >= 1000 ? `$${(spotPrice/1000).toFixed(1)}k` : `$${spotPrice}`;
+  ctx.fillText(`← ${priceLabel}/MWh`, demandX + 10, spotY + 4);
+
+  // X axis labels (MW)
+  const mwSteps = 5;
+  ctx.fillStyle = '#4a5578';
+  ctx.font = '9px Share Tech Mono';
+  ctx.textAlign = 'center';
+  for (let i = 0; i <= mwSteps; i++) {
+    const mw = Math.round((totalMW / mwSteps) * i);
+    const x = toX(mw);
+    ctx.fillText(`${Math.round(mw/1000)}GW`, x, H - PAD.bottom + 14);
+  }
+
+  // Axis labels
+  ctx.save();
+  ctx.translate(12, H / 2);
+  ctx.rotate(-Math.PI / 2);
+  ctx.fillStyle = '#4a5578';
+  ctx.font = '9px Share Tech Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('OFFER PRICE ($/MWh)', 0, 0);
+  ctx.restore();
+
+  ctx.fillStyle = '#4a5578';
+  ctx.font = '9px Share Tech Mono';
+  ctx.textAlign = 'center';
+  ctx.fillText('CUMULATIVE CAPACITY (MW)', PAD.left + chartW / 2, H - 4);
+
+  // Update UI
+  updateUI(spotPrice, marginal, offers, demand);
+}
+
+function updateUI(spotPrice, marginal, offers, demand) {
+  // Spot price display
+  const el = document.getElementById('spotPrice');
+  const formatted = spotPrice >= 1000
+    ? `$${(spotPrice/1000).toFixed(1)}k`
+    : spotPrice < 0 ? `−$${Math.abs(spotPrice)}` : `$${spotPrice}`;
+  el.textContent = formatted + '/MWh';
+  el.className = 'spot-price ' +
+    (spotPrice > 5000 ? 'high' : spotPrice > 300 ? 'medium' : spotPrice < 0 ? 'negative' : 'low');
+
+  document.getElementById('marginalUnit').textContent = `${marginal.unit} (${marginal.fuel})`;
+  document.getElementById('priceSub').innerHTML = `Spot price set by: <span id="marginalUnit">${marginal.unit} (${marginal.fuel})</span>`;
+
+  // Stats
+  const negMW = offers.filter(o => o.price < 0).reduce((a, o) => a + o.mw, 0);
+  const zeroMW = offers.filter(o => o.price === 0).reduce((a, o) => a + o.mw, 0);
+  const gasMW = offers.filter(o => o.fuel.includes('Gas') && o.xStart < demand).reduce((a, o) => a + Math.min(o.mw, demand - o.xStart), 0);
+  const totalMWgen = offers.filter(o => o.xStart < demand).reduce((a, o) => a + Math.min(o.mw, demand - o.xStart), 0);
+  const curtailRisk = negMW > demand * 0.3 ? 'HIGH' : negMW > demand * 0.1 ? 'MEDIUM' : 'LOW';
+
+  document.getElementById('stat-demand').textContent = `${(demand/1000).toFixed(1)} GW`;
+  document.getElementById('stat-marginal').textContent = marginal.fuel;
+  document.getElementById('stat-price').textContent = `$${spotPrice}/MWh`;
+  document.getElementById('stat-neg').textContent = negMW > 0 ? `${negMW.toLocaleString()} MW` : 'None';
+  document.getElementById('stat-zero').textContent = zeroMW > 0 ? `${zeroMW.toLocaleString()} MW` : 'None';
+  document.getElementById('stat-gas').textContent = gasMW > 0 ? `${Math.round(gasMW).toLocaleString()} MW` : '0 MW';
+  document.getElementById('stat-curtail').textContent = curtailRisk;
+  document.getElementById('stat-curtail').className = 'stat-val ' +
+    (curtailRisk === 'HIGH' ? 'price-vhigh' : curtailRisk === 'MEDIUM' ? 'price-mid' : 'price-low');
+
+  // Alert
+  const alertBox = document.getElementById('alertBox');
+  const sc = scenarios[currentScenario];
+  if (sc.alert) {
+    alertBox.textContent = sc.alert;
+    alertBox.classList.add('visible');
+  } else {
+    alertBox.classList.remove('visible');
+  }
+
+  // Explainer
+  document.getElementById('explainerText').textContent = sc.explainer;
+
+  // Unit table
+  renderUnitTable(offers, demand);
+
+  // Price log
+  const now = new Date();
+  priceLog.unshift({ time: now.toLocaleTimeString(), price: spotPrice, scenario: currentScenario });
+  if (priceLog.length > 20) priceLog.pop();
+}
+
+function renderUnitTable(offers, demand) {
+  const sc = scenarios[currentScenario];
+  const unitRollup = {};
+  sc.units.forEach(u => {
+    const dispatched = offers
+      .filter(o => o.unit === u.name && o.xStart < demand)
+      .reduce((a, o) => a + Math.min(o.mw, demand - o.xStart), 0);
+    const minPrice = Math.min(...u.offers.map(o => o.price));
+    unitRollup[u.name] = { fuel: u.fuel, minPrice, dispatched };
+  });
+
+  const rows = Object.entries(unitRollup)
+    .sort((a, b) => a[1].minPrice - b[1].minPrice)
+    .map(([name, d]) => {
+      const priceClass = d.minPrice < 0 ? 'price-neg' :
+                         d.minPrice === 0 ? 'price-zero' :
+                         d.minPrice < 100 ? 'price-low' :
+                         d.minPrice < 500 ? 'price-mid' :
+                         d.minPrice < 3000 ? 'price-high' : 'price-vhigh';
+      const swatch = `<span style="display:inline-block;width:8px;height:8px;background:${FUEL_COLORS[d.fuel]};border-radius:1px;margin-right:4px"></span>`;
+      return `<div class="stack-row ${hoveredUnit === name ? 'highlighted' : ''}" 
+                onmouseover="hoveredUnit='${name}';requestDraw()" 
+                onmouseout="hoveredUnit=null;requestDraw()">
+        <span class="stack-row-name">${swatch}${name.length > 18 ? name.slice(0,16)+'…' : name}</span>
+        <span class="stack-row-mw">${Math.round(d.dispatched)}MW</span>
+        <span class="stack-row-price ${priceClass}">$${d.minPrice}</span>
+      </div>`;
+    }).join('');
+  document.getElementById('unitTable').innerHTML = rows;
+}
+
+// =============================================
+// ANIMATION LOOP
+// =============================================
+function requestDraw() {
+  draw(jitterOffset);
+}
+
+function animate(ts) {
+  if (animating) {
+    if (ts - lastDraw > 2000) {
+      jitterOffset = (Math.random() - 0.5) * 200;
+      draw(jitterOffset);
+      lastDraw = ts;
+    }
+    animFrame = requestAnimationFrame(animate);
+  }
+}
+
+// =============================================
+// MOUSE INTERACTION
+// =============================================
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  const mx = e.clientX - rect.left;
+  const my = e.clientY - rect.top;
+
+  const { offers, totalMW } = buildStack(currentScenario);
+  const PAD = { left: 64, right: 20, top: 36, bottom: 40 };
+  const chartW = canvas.width - PAD.left - PAD.right;
+  const mwAtMouse = ((mx - PAD.left) / chartW) * totalMW;
+
+  const hit = offers.find(o => mwAtMouse >= o.xStart && mwAtMouse <= o.xEnd);
+
+  if (hit) {
+    tooltip.style.display = 'block';
+    tooltip.style.left = Math.min(mx + 16, canvas.offsetWidth - 200) + 'px';
+    tooltip.style.top = Math.max(my - 80, 0) + 'px';
+
+    const sc = scenarios[currentScenario];
+    const unit = sc.units.find(u => u.name === hit.unit);
+    const allOffers = unit ? unit.offers.map(o => `$${o.price}/MWh for ${o.mw}MW`).join(', ') : '';
+
+    const priceNote = hit.price < 0
+      ? `<div class="tooltip-note">⚡ Negative bid: this generator is paying to stay on. Likely receiving RECs or has must-run obligations.</div>`
+      : hit.price > 5000
+        ? `<div class="tooltip-note">⚠ Extreme price offer. If this unit is marginal, it sets the price for ALL generators — every MW in the market gets $${hit.price.toLocaleString()}.</div>`
+        : hit.price > 300
+          ? `<div class="tooltip-note">💰 High-price offer. This unit is likely a gas peaker kept as backup capacity.</div>`
+          : '';
+
+    tooltip.innerHTML = `
+      <div class="tooltip-name">${hit.unit}</div>
+      <div class="tooltip-row"><span>Fuel type</span><span>${hit.fuel}</span></div>
+      <div class="tooltip-row"><span>This offer</span><span style="color:${hit.color}">$${hit.price}/MWh × ${hit.mw}MW</span></div>
+      <div class="tooltip-row"><span>All offers</span><span style="font-size:0.58rem">${allOffers}</span></div>
+      <div class="tooltip-row"><span>Stack position</span><span>${Math.round(hit.xStart/1000).toFixed(1)}–${Math.round(hit.xEnd/1000).toFixed(1)} GW</span></div>
+      ${priceNote}
+    `;
+
+    hoveredUnit = hit.unit;
+  } else {
+    tooltip.style.display = 'none';
+    hoveredUnit = null;
+  }
+  draw(jitterOffset);
+});
+
+canvas.addEventListener('mouseleave', () => {
+  tooltip.style.display = 'none';
+  hoveredUnit = null;
+  draw(jitterOffset);
+});
+
+// =============================================
+// CONTROLS
+// =============================================
+function setRegion(region, btn) {
+  document.querySelectorAll('.controls .btn').forEach(b => {
+    if (['NEM','NSW','VIC','QLD','SA','TAS'].some(r => b.textContent === r)) b.classList.remove('active');
+  });
+  btn.classList.add('active');
+  // In production: filter units by region
+  draw(0);
+}
+
+function loadScenario(key, btnEl) {
+  currentScenario = key;
+  jitterOffset = 0;
+
+  document.querySelectorAll('.scenario-btn').forEach(b => b.classList.remove('active'));
+  const scBtn = document.getElementById('sc-' + key);
+  if (scBtn) scBtn.classList.add('active');
+
+  document.getElementById('scenarioSelect').value = key;
+  draw(0);
+}
+
+function toggleAnimate() {
+  animating = !animating;
+  document.getElementById('animBtn').textContent = animating ? '⏸ PAUSE' : '▶ PLAY';
+  if (animating) requestAnimationFrame(animate);
+}
+
+function toggleLog() {
+  // Simple log view
+  const existing = document.getElementById('priceLogPanel');
+  if (existing) { existing.remove(); return; }
+
+  const panel = document.createElement('div');
+  panel.id = 'priceLogPanel';
+  panel.style.cssText = `
+    position:fixed;bottom:20px;right:20px;width:260px;
+    background:#0e1117;border:1px solid #252d45;
+    border-radius:3px;padding:14px;z-index:200;
+    font-family:'Share Tech Mono',monospace;font-size:0.65rem;
+  `;
+  panel.innerHTML = `
+    <div style="color:#4a5578;margin-bottom:8px;border-bottom:1px solid #1c2235;padding-bottom:6px">PRICE LOG (last 20 intervals)</div>
+    ${priceLog.map(e => `
+      <div style="display:flex;justify-content:space-between;padding:3px 0;border-bottom:1px solid #1c2235">
+        <span style="color:#4a5578">${e.time}</span>
+        <span style="color:${e.price > 1000 ? '#d43a3a' : e.price < 0 ? '#3a7fd4' : '#3ab87a'}">$${e.price}</span>
+      </div>
+    `).join('')}
+    <div style="margin-top:8px;color:#4a5578;font-size:0.58rem">Updates every ~2 seconds in simulation</div>
+  `;
+  document.body.appendChild(panel);
+}
+
+// =============================================
+// LEGEND
+// =============================================
+function renderLegend() {
+  const container = document.getElementById('legend');
+  container.innerHTML = Object.entries(FUEL_COLORS).map(([fuel, color]) => `
+    <div class="legend-item">
+      <div class="legend-swatch" style="background:${color}"></div>
+      ${fuel}
+    </div>
+  `).join('');
+}
+
+// =============================================
+// CLOCK
+// =============================================
+function updateClock() {
+  document.getElementById('clock').textContent =
+    new Date().toLocaleTimeString('en-AU') + ' AEST';
+}
+
+// =============================================
+// RESIZE
+// =============================================
+window.addEventListener('resize', () => draw(jitterOffset));
+
+// =============================================
+// INIT
+// =============================================
+renderLegend();
+draw(0);
+setInterval(updateClock, 1000);
+requestAnimationFrame(animate);
+</script>
+</body>
+</html>
