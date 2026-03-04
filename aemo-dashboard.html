@@ -851,10 +851,10 @@ const DUID_FUEL = {
   'YWPS1':'Brown Coal','YWPS2':'Brown Coal','YWPS3':'Brown Coal','YWPS4':'Brown Coal',
 
   // GAS (OCGT)
-  'ALDGASF1':'Gas (OCGT)',
+  'ALDGASF1':'Gas (Cogen)',  // Aldoga QLD — cogeneration
   'BANN1':'Gas (OCGT)',
   'GERMCRK':'Gas (OCGT)',
-  'CONDONG1':'Gas (OCGT)',
+  'CONDONG1':'Gas (Cogen)',  // Condong sugar mill cogen NSW
   'BUTLERSG':'Gas (OCGT)',
   'SHOAL1':'Gas (OCGT)',
   'DDPS1':'Gas (OCGT)',
@@ -901,17 +901,16 @@ const DUID_FUEL = {
   'VPGS1':'Gas (OCGT)','VPGS2':'Gas (OCGT)','VPGS3':'Gas (OCGT)',
   'VPGS4':'Gas (OCGT)','VPGS5':'Gas (OCGT)','VPGS6':'Gas (OCGT)',  // Valley Power VIC
   'YABULU':'Gas (OCGT)','YABULU2':'Gas (OCGT)',  // Yabulu QLD
-  'YARWUN_1':'Gas (OCGT)',   // Yarwun QLD cogen
+  'YARWUN_1':'Gas (Cogen)',  // Yarwun QLD cogen
 
   // GAS (CCGT)
   'MP1':'Gas (CCGT)','MP2':'Gas (CCGT)',  // Mortlake VIC CCGT
   'LADBROK1':'Gas (CCGT)','LADBROK2':'Gas (CCGT)',  // Ladbroke Grove SA
-  'PTSTAN1':'Gas (CCGT)',   // Pelican Point SA
 
   // DIESEL / LIQUID FUEL
   'BDL01':'Diesel','BDL02':'Diesel',  // Broken Hill diesel NSW
   'BHB1':'Diesel',   // Broken Hill backup
-  'ERB01':'Diesel',  // Eraring backup NSW
+  'ERB01':'Black Coal',  // Eraring NSW unit (black coal)
   'GB01':'Diesel',   // gas/diesel backup
   'SNB01':'Diesel','SNB02':'Diesel',  // Snowy backup
   'TB2B1':'Diesel',  // backup unit
@@ -1233,6 +1232,7 @@ const FUEL_META = {
   'Wind':             { color: '#4be896', type: 're'   },
   'Solar (utility)':  { color: '#e8d44b', type: 're'   },
   'Solar (rooftop)':  { color: '#e8b84b', type: 're'   },
+  'Gas (Cogen)':      { color: '#8b9dc3', type: 'disp' },
   'Battery':          { color: '#a855f7', type: 'disp' },
   'Battery (charge)': { color: '#7c3aad', type: 'load' },
   'Diesel':           { color: '#92400e', type: 'disp' },
@@ -1241,7 +1241,7 @@ const FUEL_META = {
 
 // Display order for gen mix bars — loads (negative) shown at bottom
 const FUEL_ORDER = [
-  'Black Coal', 'Brown Coal', 'Gas (CCGT)', 'Gas (OCGT)',
+  'Black Coal', 'Brown Coal', 'Gas (CCGT)', 'Gas (OCGT)', 'Gas (Cogen)',
   'Hydro', 'Wind', 'Solar (utility)', 'Solar (rooftop)', 'Battery', 'Diesel', 'Other',
   'Hydro (pumping)', 'Battery (charge)'
 ];
@@ -1287,8 +1287,6 @@ async function fetchLiveData() {
           fuelTotals['Battery (charge)'] = (fuelTotals['Battery (charge)'] || 0) + mw;
         } else if (mw < 0 && fuel === 'Hydro') {
           fuelTotals['Hydro (pumping)'] = (fuelTotals['Hydro (pumping)'] || 0) + mw;
-        } else if (mw < 0) {
-          // Ignore negative MW for all other fuel types (aux/backup units at idle)
         } else {
           fuelTotals[fuel] = (fuelTotals[fuel] || 0) + mw;
         }
