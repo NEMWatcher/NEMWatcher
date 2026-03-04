@@ -514,14 +514,18 @@
           <button class="info-btn" onclick="toggleExp('exp-freq')">ⓘ</button>
         </div>
         <div class="freq-wrap">
-          <div class="freq-value" id="freq-val">50.03<span class="metric-unit">Hz</span></div>
+          <div class="freq-value" id="freq-val">—<span class="metric-unit">Hz</span></div>
           <div class="freq-bar-wrap">
-            <div class="freq-bar" id="freq-bar" style="width:52%;background:var(--green);left:0"></div>
+            <div class="freq-bar" id="freq-bar" style="width:50%;background:var(--green);left:0"></div>
             <div class="freq-target"></div>
           </div>
           <div class="freq-labels"><span>49.5</span><span>← 50Hz target →</span><span>50.5</span></div>
         </div>
-        <div class="metric-sub" id="freq-status">NORMAL — within ±0.1Hz operating band</div>
+        <div class="metric-sub" id="freq-status">Loading...</div>
+        <div style="margin-top:6px;font-size:0.75rem;color:var(--text-dim)">
+          Tasmania: <span id="freq-tas">—</span> Hz
+          <span style="margin-left:8px;color:var(--text-dim);font-size:0.7rem">Source: AEMO FPP API</span>
+        </div>
         <div class="explainer" id="exp-freq">
           <div class="explainer-title">What does this mean?</div>
           <p>The grid must stay very close to 50Hz at all times. Think of it like the "heartbeat" of the electricity network. When too many generators go offline suddenly (or demand spikes), frequency drops. When there's too much power, it rises.</p>
@@ -756,7 +760,7 @@
         <div style="font-size:0.8rem;line-height:1.8;color:var(--text)">
           <div class="cost-item"><span class="cost-label">Generation dispatch</span><span class="cost-value" style="color:var(--green)">AEMO NEMWeb</span></div>
           <div class="cost-item"><span class="cost-label">Spot prices</span><span class="cost-value" style="color:var(--green)">AEMO NEMWeb</span></div>
-          <div class="cost-item"><span class="cost-label">Grid frequency</span><span class="cost-value" style="color:var(--green)">AEMO NEMWeb</span></div>
+          <div class="cost-item"><span class="cost-label">Grid frequency</span><span class="cost-value" style="color:var(--green)">AEMO FPP API (live)</span></div>
           <div class="cost-item"><span class="cost-label">FCAS costs</span><span class="cost-value" style="color:var(--green)">AEMO FCAS reports</span></div>
           <div class="cost-item"><span class="cost-label">Interconnector flows</span><span class="cost-value" style="color:var(--green)">AEMO NEMWeb</span></div>
           <div class="cost-item"><span class="cost-label">System costs</span><span class="cost-value" style="color:var(--green)">AER Annual Reports</span></div>
@@ -816,7 +820,7 @@
 // NEMWATCHER — M1 Live Grid Overview
 // Data source: Cloudflare Worker proxying AEMO NEMWeb
 // Worker endpoint: https://worker.nemwatcher.workers.dev/live
-// Frequency and FCAS: [SIMULATED] — not yet in Worker response
+// Frequency: live via AEMO FPP API. FCAS: [SIMULATED] — not yet in Worker response
 // =============================================================
 
 const WORKER_URL = 'https://worker.nemwatcher.workers.dev/live';
@@ -1335,6 +1339,7 @@ async function fetchLiveData() {
     renderStatePrices();
     updateNEMAvgPrice();
     updateTotalDemand(totalMW);
+    updateFrequency(data.frequency_mainland, data.frequency_tasmania);
 
   } catch (err) {
     console.error('Worker fetch failed:', err);
@@ -1464,35 +1469,50 @@ function updateDispatchable() {
 }
 
 // -------------------------------------------------------------
-// FREQUENCY — [SIMULATED] until Worker provides this field
-// Labelled clearly. Will be replaced when Worker /live includes frequency.
+// FREQUENCY — live data from AEMO FPP API via Worker
+// Mainland NEM (NSW1) and Tasmania (TAS1) shown separately.
+// Called after fetchLiveData() resolves with fresh Worker data.
 // -------------------------------------------------------------
-function updateFrequency() {
-  const base = 50;
-  const variation = (Math.random() - 0.5) * 0.12;
-  const freq = (base + variation).toFixed(3);
-  const freqEl  = document.getElementById('freq-val');
-  const barEl   = document.getElementById('freq-bar');
+function updateFrequency(mainland_hz, tasmania_hz) {
+  const freqEl   = document.getElementById('freq-val');
+  const barEl    = document.getElementById('freq-bar');
   const statusEl = document.getElementById('freq-status');
+  const tasEl    = document.getElementById('freq-tas');
 
-  freqEl.innerHTML = `${freq}<span class="metric-unit">Hz</span>`;
+  if (mainland_hz === null || mainland_hz === undefined) {
+    freqEl.innerHTML = '—<span class="metric-unit">Hz</span>';
+    statusEl.textContent = 'Frequency data unavailable';
+    return;
+  }
 
-  const pct   = 50 + ((parseFloat(freq) - 50) / 0.5) * 50;
+  const freq = parseFloat(mainland_hz);
+  freqEl.innerHTML = `${freq.toFixed(3)}<span class="metric-unit">Hz</span>`;
+
+  if (tasmania_hz !== null && tasmania_hz !== undefined) {
+    tasEl.textContent = parseFloat(tasmania_hz).toFixed(3);
+  }
+
+  // Bar position: scale so 49.5–50.5 Hz maps to 0–100%
+  const pct   = 50 + ((freq - 50) / 0.5) * 50;
   const clamp = Math.max(5, Math.min(95, pct));
   barEl.style.width = clamp + '%';
 
-  const diff = Math.abs(parseFloat(freq) - 50);
-  if (diff < 0.05) {
+  // Thresholds from AEMC Frequency Operating Standard (FOS):
+  // NOFB  = Normal Operating Frequency Band      ±0.15 Hz (49.85–50.15) — must be here 99% of time
+  // NOFEB = Normal Operating Frequency Excursion Band ±0.25 Hz (49.75–50.25) — contingency FCAS activates
+  // Beyond NOFEB = reportable FOS exceedance
+  const diff = Math.abs(freq - 50);
+  if (diff <= 0.15) {
     barEl.style.background = 'var(--green)';
-    statusEl.textContent = '[SIMULATED] NORMAL — within ±0.05Hz';
+    statusEl.textContent = 'NORMAL — within NOFB (±0.15Hz) | Source: AEMC Frequency Operating Standard';
     document.getElementById('freq-card').className = 'card ok';
-  } else if (diff < 0.15) {
+  } else if (diff <= 0.25) {
     barEl.style.background = 'var(--accent)';
-    statusEl.textContent = '[SIMULATED] WATCH — approaching contingency band';
+    statusEl.textContent = 'CONTINGENCY FCAS ACTIVE — outside NOFB, within NOFEB (±0.25Hz)';
     document.getElementById('freq-card').className = 'card warn';
   } else {
     barEl.style.background = 'var(--red)';
-    statusEl.textContent = '[SIMULATED] CONTINGENCY — outside normal band';
+    statusEl.textContent = 'FOS EXCEEDANCE — outside NOFEB (±0.25Hz) — reportable event';
     document.getElementById('freq-card').className = 'card danger';
   }
 }
@@ -1648,10 +1668,7 @@ document.getElementById('gen-mix').innerHTML =
   '<div style="color:var(--text-dim);font-family:\'IBM Plex Mono\',monospace;font-size:0.75rem;padding:12px 0">Fetching live AEMO data...</div>';
 document.getElementById('curtail').textContent = 'Loading...';
 
-// Start frequency simulation (clearly labelled [SIMULATED])
-updateFrequency();
-setInterval(updateFrequency, 3000);
-
+// Frequency is updated via fetchLiveData() — no separate interval needed
 // Fetch live data immediately, then every 5 minutes
 fetchLiveData();
 setInterval(() => {
