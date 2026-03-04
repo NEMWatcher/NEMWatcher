@@ -854,7 +854,10 @@ const DUID_FUEL = {
   'ALDGASF1':'Gas (Cogen)',  // Aldoga QLD — cogeneration
   'BANN1':'Gas (OCGT)',
   'GERMCRK':'Gas (OCGT)',
-  'CONDONG1':'Gas (Cogen)',  // Condong sugar mill cogen NSW
+  'CONDONG1':'Biomass',  // Condong sugar mill NSW
+  'BROKENH1':'Biomass',  // Broadwater sugar mill NSW
+  'MCKAY1':'Biomass',    // Mackay Sugar QLD
+  'TULLYSM1':'Biomass',  // Tully Sugar Mill QLD
   'BUTLERSG':'Gas (OCGT)',
   'SHOAL1':'Gas (OCGT)',
   'DDPS1':'Gas (OCGT)',
@@ -1233,6 +1236,7 @@ const FUEL_META = {
   'Solar (utility)':  { color: '#e8d44b', type: 're'   },
   'Solar (rooftop)':  { color: '#e8b84b', type: 're'   },
   'Gas (Cogen)':      { color: '#8b9dc3', type: 'disp' },
+  'Biomass':          { color: '#4a7c3f', type: 'disp' },
   'Battery':          { color: '#a855f7', type: 'disp' },
   'Battery (charge)': { color: '#7c3aad', type: 'load' },
   'Diesel':           { color: '#92400e', type: 'disp' },
@@ -1241,7 +1245,7 @@ const FUEL_META = {
 
 // Display order for gen mix bars — loads (negative) shown at bottom
 const FUEL_ORDER = [
-  'Black Coal', 'Brown Coal', 'Gas (CCGT)', 'Gas (OCGT)', 'Gas (Cogen)',
+  'Black Coal', 'Brown Coal', 'Gas (CCGT)', 'Gas (OCGT)', 'Gas (Cogen)', 'Biomass',
   'Hydro', 'Wind', 'Solar (utility)', 'Solar (rooftop)', 'Battery', 'Diesel', 'Other',
   'Hydro (pumping)', 'Battery (charge)'
 ];
