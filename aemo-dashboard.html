@@ -1223,23 +1223,26 @@ const DUID_FUEL = {
 };
 
 const FUEL_META = {
-  'Black Coal': { color: '#4a4a5a', type: 'disp' },
-  'Brown Coal': { color: '#8b6a3a', type: 'disp' },
-  'Gas (OCGT)': { color: '#6b7fa8', type: 'disp' },
-  'Gas (CCGT)': { color: '#5a6e97', type: 'disp' },
-  'Hydro':      { color: '#4b8be8', type: 'disp' },
-  'Wind':       { color: '#4be896', type: 're'   },
-  'Solar (utility)': { color: '#e8d44b', type: 're' },
-  'Solar (rooftop)': { color: '#e8b84b', type: 're' },
-  'Battery':    { color: '#a855f7', type: 'disp' },
-  'Diesel':     { color: '#92400e', type: 'disp' },
-  'Other':      { color: '#6b7590', type: 'disp' },
+  'Black Coal':       { color: '#4a4a5a', type: 'disp' },
+  'Brown Coal':       { color: '#8b6a3a', type: 'disp' },
+  'Gas (OCGT)':       { color: '#6b7fa8', type: 'disp' },
+  'Gas (CCGT)':       { color: '#5a6e97', type: 'disp' },
+  'Hydro':            { color: '#4b8be8', type: 'disp' },
+  'Hydro (pumping)':  { color: '#2a5a9a', type: 'load' },
+  'Wind':             { color: '#4be896', type: 're'   },
+  'Solar (utility)':  { color: '#e8d44b', type: 're'   },
+  'Solar (rooftop)':  { color: '#e8b84b', type: 're'   },
+  'Battery':          { color: '#a855f7', type: 'disp' },
+  'Battery (charge)': { color: '#7c3aad', type: 'load' },
+  'Diesel':           { color: '#92400e', type: 'disp' },
+  'Other':            { color: '#6b7590', type: 'disp' },
 };
 
-// Display order for gen mix bars
+// Display order for gen mix bars — loads (negative) shown at bottom
 const FUEL_ORDER = [
   'Black Coal', 'Brown Coal', 'Gas (CCGT)', 'Gas (OCGT)',
-  'Hydro', 'Wind', 'Solar (utility)', 'Solar (rooftop)', 'Battery', 'Diesel', 'Other'
+  'Hydro', 'Wind', 'Solar (utility)', 'Solar (rooftop)', 'Battery', 'Diesel', 'Other',
+  'Hydro (pumping)', 'Battery (charge)'
 ];
 
 // -------------------------------------------------------------
@@ -1276,25 +1279,38 @@ async function fetchLiveData() {
     const unrecognised = [];
     (data.generation || []).forEach(g => {
       const fuel = DUID_FUEL[g.duid];
+      const mw = g.mw || 0;
       if (fuel) {
-        fuelTotals[fuel] = (fuelTotals[fuel] || 0) + g.mw;
+        // Split negative MW into load buckets for battery and hydro
+        if (mw < 0 && fuel === 'Battery') {
+          fuelTotals['Battery (charge)'] = (fuelTotals['Battery (charge)'] || 0) + mw;
+        } else if (mw < 0 && fuel === 'Hydro') {
+          fuelTotals['Hydro (pumping)'] = (fuelTotals['Hydro (pumping)'] || 0) + mw;
+        } else {
+          fuelTotals[fuel] = (fuelTotals[fuel] || 0) + mw;
+        }
       } else {
         unrecognised.push(g.duid);
-        fuelTotals['Other'] = (fuelTotals['Other'] || 0) + g.mw;
+        fuelTotals['Other'] = (fuelTotals['Other'] || 0) + Math.max(0, mw);
       }
     });
     if (unrecognised.length > 0) {
       console.warn('NEMWatcher: unrecognised DUIDs (add to DUID_FUEL map):', unrecognised.join(', '));
     }
 
-    const totalMW = Object.values(fuelTotals).reduce((a, b) => a + b, 0);
+    // Total MW uses only positive generation for percentage calculations
+    const totalMW = Object.entries(fuelTotals)
+      .filter(([f]) => FUEL_META[f]?.type !== 'load')
+      .reduce((a, [, v]) => a + v, 0);
 
     liveGenMix = FUEL_ORDER
-      .filter(f => fuelTotals[f] > 0)
+      .filter(f => fuelTotals[f] !== undefined && fuelTotals[f] !== 0)
       .map(f => ({
         name: f,
         mw: Math.round(fuelTotals[f]),
-        pct: totalMW > 0 ? Math.round((fuelTotals[f] / totalMW) * 1000) / 10 : 0,
+        pct: FUEL_META[f].type === 'load'
+          ? Math.round((Math.abs(fuelTotals[f]) / totalMW) * 1000) / 10
+          : (totalMW > 0 ? Math.round((fuelTotals[f] / totalMW) * 1000) / 10 : 0),
         color: FUEL_META[f].color,
         type: FUEL_META[f].type,
       }));
@@ -1334,17 +1350,30 @@ function renderGenMix() {
     container.innerHTML = '<div style="color:var(--text-dim);font-family:\'IBM Plex Mono\',monospace;font-size:0.75rem;padding:12px 0">Loading generation data...</div>';
     return;
   }
-  container.innerHTML = liveGenMix.map(g => `
-    <div class="gen-source">
-      <div class="gen-name">${g.name} ${g.type === 're' ? '<span class="tag tag-re">RE</span>' : '<span class="tag tag-disp">D</span>'}</div>
+  container.innerHTML = liveGenMix.map(g => {
+    const isLoad = g.type === 'load';
+    const tag = isLoad
+      ? '<span class="tag" style="background:#1e1030;color:#a855f7;border:1px solid #a855f7">LOAD</span>'
+      : g.type === 're'
+        ? '<span class="tag tag-re">RE</span>'
+        : '<span class="tag tag-disp">D</span>';
+    const mwDisplay = isLoad
+      ? `−${Math.abs(g.mw).toLocaleString()} MW`
+      : `${g.mw.toLocaleString()} MW`;
+    const barStyle = isLoad
+      ? `width:${Math.min(g.pct * 2.2, 100)}%;background:${g.color};opacity:0.7;`
+      : `width:${Math.min(g.pct * 2.2, 100)}%;background:${g.color};`;
+    return `
+    <div class="gen-source" style="${isLoad ? 'opacity:0.85;' : ''}">
+      <div class="gen-name">${g.name} ${tag}</div>
       <div class="gen-bar-bg">
-        <div class="gen-bar-fill" style="width:${Math.min(g.pct * 2.2, 100)}%;background:${g.color};">
+        <div class="gen-bar-fill" style="${barStyle}">
           ${g.pct >= 5 ? `<span class="gen-bar-label">${g.pct}%</span>` : ''}
         </div>
       </div>
-      <div class="gen-mw">${g.mw.toLocaleString()} MW</div>
-    </div>
-  `).join('');
+      <div class="gen-mw" style="${isLoad ? 'color:#a855f7;' : ''}">${mwDisplay}</div>
+    </div>`;
+  }).join('');
 }
 
 // -------------------------------------------------------------
