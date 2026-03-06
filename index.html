@@ -562,11 +562,11 @@
       <!-- FCAS Cost -->
       <div class="card danger">
         <div class="card-title">
-          FCAS Cost Today
+          FCAS Cost (Regulation)
           <button class="info-btn" onclick="toggleExp('exp-fcas')">ⓘ</button>
         </div>
-        <div class="metric-value val-red" id="fcas-val">$4.2M<span class="metric-unit">/day</span></div>
-        <div class="metric-sub">↑ 340% vs 2018 baseline</div>
+        <div class="metric-value val-red" id="fcas-val">--<span class="metric-unit"></span></div>
+        <div class="metric-sub" id="fcas-sub">loading...</div>
         <div class="explainer" id="exp-fcas">
           <div class="explainer-title">What is FCAS?</div>
           <p>Frequency Control Ancillary Services. These are expensive contracts paid to generators to stand ready to inject or absorb power within seconds. As coal plants close and are replaced by wind/solar, FCAS costs have exploded because there is less natural grid inertia.</p>
@@ -989,6 +989,27 @@ function updatePrices() {
   document.getElementById('price-val').innerHTML = `$${avg}<span class="metric-unit">/MWh</span>`;
 }
 
+// ===== LIVE FCAS =====
+async function updateFCAS() {
+  try {
+    const res = await fetch('https://worker.nemwatcher.workers.dev/live');
+    const data = await res.json();
+    const fcas = data.fcas;
+    if (!fcas) return;
+    const intervalCost = fcas.total_cost
+      ? '$' + fcas.total_cost.toLocaleString('en-AU', { maximumFractionDigits: 0 })
+      : '--';
+    const daily = fcas.total_cost_24hr
+      ? '$' + Math.round(fcas.total_cost_24hr).toLocaleString('en-AU') + ' last 24hrs'
+      : '';
+    document.getElementById('fcas-val').innerHTML = intervalCost + '<span class="metric-unit"> this interval</span>';
+    document.getElementById('fcas-sub').textContent = daily + ' · regulation FCAS only (RAISEREG/LOWERREG)';
+  } catch (e) {
+    document.getElementById('fcas-val').innerHTML = '--';
+    document.getElementById('fcas-sub').textContent = 'data unavailable';
+  }
+}
+
 // ===== CURTAILMENT =====
 document.getElementById('curtail').textContent = '1,240 MW wasted (5.4% of available renewable capacity)';
 
@@ -1021,9 +1042,11 @@ renderStatePrices();
 renderEvents();
 renderReserveMeter();
 updateFrequency();
+updateFCAS();
 updateTime();
 
 setInterval(updateFrequency, 3000);
+setInterval(updateFCAS, 300000);
 setInterval(updatePrices, 8000);
 setInterval(updateTime, 1000);
 </script>
