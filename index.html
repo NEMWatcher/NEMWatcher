@@ -566,11 +566,11 @@
       <!-- FCAS Cost -->
       <div class="card danger">
         <div class="card-title">
-          FCAS Cost Today
+          FCAS Cost (Regulation)
           <button class="info-btn" onclick="toggleExp('exp-fcas')">ⓘ</button>
         </div>
-        <div class="metric-value val-red" id="fcas-val">$4.2M<span class="metric-unit">/day</span></div>
-        <div class="metric-sub">↑ 340% vs 2018 baseline</div>
+        <div class="metric-value val-red" id="fcas-val">--<span class="metric-unit"></span></div>
+        <div class="metric-sub" id="fcas-sub">loading...</div>
         <div class="explainer" id="exp-fcas">
           <div class="explainer-title">What is FCAS?</div>
           <p>Frequency Control Ancillary Services. These are expensive contracts paid to generators to stand ready to inject or absorb power within seconds. As coal plants close and are replaced by wind/solar, FCAS costs have exploded because there is less natural grid inertia.</p>
@@ -1517,17 +1517,26 @@ function updateFrequency(mainland_hz, tasmania_hz) {
   }
 }
 
-// -------------------------------------------------------------
-// FCAS — [SIMULATED] until Worker provides this field
-// Labelled clearly. Will be replaced when Worker /live includes FCAS data.
-// -------------------------------------------------------------
-// FCAS card HTML already shows static $4.2M/day from the original markup.
-// The metric-sub text is updated here to flag it as simulated.
-document.addEventListener('DOMContentLoaded', () => {
-  const fcasSub = document.querySelector('#fcas-val + .metric-sub') ||
-    document.querySelector('.card.danger .metric-sub');
-  // Flag is added via the card title update below — no JS needed beyond label
-});
+// ===== LIVE FCAS =====
+async function updateFCAS() {
+  try {
+    const res = await fetch('https://worker.nemwatcher.workers.dev/live');
+    const data = await res.json();
+    const fcas = data.fcas;
+    if (!fcas) return;
+    const intervalCost = fcas.total_cost
+      ? '$' + fcas.total_cost.toLocaleString('en-AU', { maximumFractionDigits: 0 })
+      : '--';
+    const daily = fcas.total_cost_24hr
+      ? '$' + Math.round(fcas.total_cost_24hr).toLocaleString('en-AU') + ' last 24hrs'
+      : '';
+    document.getElementById('fcas-val').innerHTML = intervalCost + '<span class="metric-unit"> this interval</span>';
+    document.getElementById('fcas-sub').textContent = daily + ' · regulation FCAS only (RAISEREG/LOWERREG)';
+  } catch (e) {
+    document.getElementById('fcas-val').innerHTML = '--';
+    document.getElementById('fcas-sub').textContent = 'data unavailable';
+  }
+}
 
 // -------------------------------------------------------------
 // CURTAILMENT — [ESTIMATED] derived figure, labelled accordingly
@@ -1671,12 +1680,14 @@ document.getElementById('curtail').textContent = 'Loading...';
 // Frequency is updated via fetchLiveData() — no separate interval needed
 // Fetch live data immediately, then every 5 minutes
 fetchLiveData();
+updateFCAS();
 setInterval(() => {
   fetchLiveData().then(() => {
     updateDispatchable();
     updateCurtailment();
   });
 }, REFRESH_INTERVAL_MS);
+setInterval(updateFCAS, 300000);
 
 // After first fetch resolves, update derived panels
 fetchLiveData().then(() => {
