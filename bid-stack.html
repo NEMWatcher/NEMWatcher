@@ -1339,7 +1339,7 @@ async function fetchLiveData() {
     renderStatePrices();
     updateNEMAvgPrice();
     updateTotalDemand(totalMW);
-    updateFrequency(data.frequency, null);
+    updateFrequency(data.frequency_mainland, data.frequency_tasmania);
 
   } catch (err) {
     console.error('Worker fetch failed:', err);
