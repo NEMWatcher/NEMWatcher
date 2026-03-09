@@ -820,6 +820,90 @@
 // TERM REGISTRY
 // =============================================================================
 
+const TERM_REGISTRY = {
+
+  gridDemand: {
+    displayLabel: 'Grid Demand',
+    shortDescription: 'Electricity being consumed across the grid right now, as seen by the market operator.',
+    technicalDefinition: 'Total scheduled and semi-scheduled load served by grid-connected generation, excluding behind-the-meter generation.',
+    sourceTerm: 'Operational Demand',
+    sourceNote: 'AEMO-defined. Excludes rooftop solar output, which offsets consumption before the meter.',
+  },
+
+  totalElectricityUse: {
+    displayLabel: 'Total Electricity Use',
+    shortDescription: 'All electricity consumed, including what rooftop solar supplies directly to homes and businesses.',
+    technicalDefinition: 'Operational Demand plus estimated behind-the-meter generation (primarily rooftop PV).',
+    sourceTerm: 'Underlying Demand',
+    sourceNote: 'AEMO-defined. Rooftop solar estimate sourced from AEMO aggregate PV data.',
+  },
+
+  batteryCharging: {
+    displayLabel: 'Battery Charging',
+    shortDescription: 'Grid-scale batteries currently drawing power from the grid to charge.',
+    technicalDefinition: 'Negative MW output from registered battery storage DUIDs. Shown as load, not netted against generation.',
+    sourceTerm: 'Storage load (negative dispatch MW)',
+    sourceNote: 'Site-defined split: battery DUIDs with negative MW are separated into this category.',
+  },
+
+  batteryDischarge: {
+    displayLabel: 'Battery Discharge',
+    shortDescription: 'Grid-scale batteries currently releasing stored energy into the grid.',
+    technicalDefinition: 'Positive MW output from registered battery storage DUIDs.',
+    sourceTerm: 'Storage generation (positive dispatch MW)',
+    sourceNote: 'Site-defined. Shown separately from other generation types.',
+  },
+
+  pumpedHydroPumping: {
+    displayLabel: 'Pumped Hydro (Pumping)',
+    shortDescription: 'Pumped hydro stations currently consuming power to pump water uphill into storage.',
+    technicalDefinition: 'Negative MW output from registered hydro DUIDs operating in pumping mode.',
+    sourceTerm: 'Pumped storage load (negative dispatch MW)',
+    sourceNote: 'Site-defined split: hydro DUIDs with negative MW are separated into this category.',
+  },
+
+  pumpedHydroGeneration: {
+    displayLabel: 'Pumped Hydro (Generating)',
+    shortDescription: 'Pumped hydro stations currently releasing stored water to generate electricity.',
+    technicalDefinition: 'Positive MW output from registered hydro DUIDs capable of pumped storage operation.',
+    sourceTerm: 'Hydro generation (positive dispatch MW)',
+    sourceNote: 'Not all hydro DUIDs are pumped storage. Classification based on DUID register.',
+  },
+
+  renewableGeneration: {
+    displayLabel: 'Renewable Generation',
+    shortDescription: 'Electricity currently being generated from wind, solar, and hydro sources.',
+    technicalDefinition: 'Sum of MW output from DUIDs classified as Wind, Solar (utility), Solar (rooftop), and Hydro.',
+    sourceTerm: 'Variable renewable energy (VRE) plus dispatchable renewable',
+    sourceNote: 'Hydro is included as renewable. Battery discharge is excluded. Percentage denominator is total generation MW.',
+  },
+
+  frequencyControl: {
+    displayLabel: 'Frequency Control',
+    shortDescription: 'The process of keeping grid frequency at 50 Hz by balancing supply and demand in real time.',
+    technicalDefinition: 'Frequency is maintained within bands defined by the AEMC Frequency Operating Standard. FCAS markets procure raise and lower services to correct deviations.',
+    sourceTerm: 'Frequency Control Ancillary Services (FCAS)',
+    sourceNote: 'AEMO-defined market service. Thresholds: NOFB ±0.15 Hz, NOFEB ±0.25 Hz.',
+  },
+
+  curtailment: {
+    displayLabel: 'Curtailment',
+    shortDescription: 'Renewable generation that was available but switched off or reduced, usually due to grid constraints or oversupply.',
+    technicalDefinition: 'Difference between available generation capacity and actual dispatch for renewable DUIDs. Requires available capacity data not currently in the Worker response.',
+    sourceTerm: 'Dispatch curtailment',
+    sourceNote: '[ESTIMATED] — not yet calculated from live data. Available capacity data required.',
+  },
+
+  interconnectorFlow: {
+    displayLabel: 'Interconnector Flow',
+    shortDescription: 'Electricity flowing between states through high-voltage transmission links.',
+    technicalDefinition: 'Net MW flow on registered NEM interconnectors. Positive = export from reference region, negative = import.',
+    sourceTerm: 'Interconnector MW flow (net interchange)',
+    sourceNote: 'AEMO-defined. Sign convention follows AEMO regional net interchange direction.',
+  },
+
+};
+
 // =============================================================
 // NEMWATCHER — M1 Live Grid Overview
 // Data source: Cloudflare Worker proxying AEMO NEMWeb
