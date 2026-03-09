@@ -1568,7 +1568,7 @@ function updateTotalDemand(totalMW) {
 // -------------------------------------------------------------
 function updateDispatchable() {
   if (!liveGenMix.length) return;
-  const totalMW = liveGenMix.reduce((a, g) => a + g.mw, 0);
+  const totalMW = liveGenMix.filter(g => g.type !== 'load').reduce((a, g) => a + g.mw, 0);
   const dispMW  = liveGenMix.filter(g => g.type === 'disp').reduce((a, g) => a + g.mw, 0);
   const pct = totalMW > 0 ? Math.round((dispMW / totalMW) * 100) : 0;
 
