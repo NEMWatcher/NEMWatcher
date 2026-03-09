@@ -1432,6 +1432,7 @@ async function fetchLiveData() {
     updateNEMAvgPrice();
     updateTotalDemand(totalMW);
     updateFrequency(data.frequency_mainland, data.frequency_tasmania);
+    updateFCAS(data.fcas);
 
   } catch (err) {
     console.error('Worker fetch failed:', err);
@@ -1628,11 +1629,9 @@ function updateFrequency(mainland_hz, tasmania_hz) {
 }
 
 // ===== LIVE FCAS =====
-async function updateFCAS() {
+// Called from fetchLiveData() with data.fcas — no separate fetch needed
+function updateFCAS(fcas) {
   try {
-    const res = await fetch('https://worker.nemwatcher.workers.dev/live');
-    const data = await res.json();
-    const fcas = data.fcas;
     if (!fcas) return;
     const intervalCost = fcas.total_cost
       ? '$' + fcas.total_cost.toLocaleString('en-AU', { maximumFractionDigits: 0 })
@@ -1792,14 +1791,12 @@ document.getElementById('gen-mix').innerHTML =
 document.getElementById('curtail').textContent = 'Loading...';
 
 // Fetch live data immediately, then every 5 minutes
-updateFCAS();
 setInterval(() => {
   fetchLiveData().then(() => {
     updateDispatchable();
     updateCurtailment();
   });
 }, REFRESH_INTERVAL_MS);
-setInterval(updateFCAS, 300000);
 
 // After first fetch resolves, update derived panels
 fetchLiveData().then(() => {
