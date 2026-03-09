@@ -951,8 +951,6 @@ const DUID_FUEL = {
   'BANN1':'Gas (OCGT)',
   'GERMCRK':'Gas (OCGT)',
   'CONDONG1':'Biomass',  // Condong sugar mill NSW
-  'BROKENH1':'Biomass',  // Broadwater sugar mill NSW
-  'MCKAY1':'Biomass',    // Mackay Sugar QLD
   'TULLYSM1':'Biomass',  // Tully Sugar Mill QLD
   'BUTLERSG':'Gas (OCGT)',
   'SHOAL1':'Gas (OCGT)',
@@ -1071,7 +1069,6 @@ const DUID_FUEL = {
   'TARRALEA':'Hydro',      // Tarralea TAS
   'TREVALLN':'Hydro',      // Trevallyn TAS
   'TRIBUTE':'Hydro',       // Tribute TAS
-  'TULLYSM1':'Hydro',      // Tully-Millstream QLD
   'TUMUT3':'Hydro',        // Tumut 3 NSW
   'TUNGATIN':'Hydro',      // Tungatinah TAS
   'WDGPH1':'Hydro',        // Wivenhoe pumped hydro QLD
@@ -1285,6 +1282,7 @@ const DUID_FUEL = {
   'LGAPWF1':'Wind',        // Lake George wind NSW
   'LI_WY_CA':'Battery',    // Li-Cycle battery
   'LIMBESS1':'Battery',    // Limbri battery NSW
+  'MLB01':'Battery',       // Melbourne load battery
   'MANNUMB1':'Battery',    // Mannuem battery NSW
   'MANSLR1':'Battery',     // Manslr battery
   'NESBESS1':'Battery','NESBESS2':'Battery',  // Nestle battery
@@ -1432,7 +1430,6 @@ async function fetchLiveData() {
     updateNEMAvgPrice();
     updateTotalDemand(totalMW);
     updateFrequency(data.frequency_mainland, data.frequency_tasmania);
-    updateFCAS(data.fcas);
 
   } catch (err) {
     console.error('Worker fetch failed:', err);
@@ -1629,9 +1626,11 @@ function updateFrequency(mainland_hz, tasmania_hz) {
 }
 
 // ===== LIVE FCAS =====
-// Called from fetchLiveData() with data.fcas — no separate fetch needed
-function updateFCAS(fcas) {
+async function updateFCAS() {
   try {
+    const res = await fetch('https://worker.nemwatcher.workers.dev/live');
+    const data = await res.json();
+    const fcas = data.fcas;
     if (!fcas) return;
     const intervalCost = fcas.total_cost
       ? '$' + fcas.total_cost.toLocaleString('en-AU', { maximumFractionDigits: 0 })
@@ -1791,12 +1790,14 @@ document.getElementById('gen-mix').innerHTML =
 document.getElementById('curtail').textContent = 'Loading...';
 
 // Fetch live data immediately, then every 5 minutes
+updateFCAS();
 setInterval(() => {
   fetchLiveData().then(() => {
     updateDispatchable();
     updateCurtailment();
   });
 }, REFRESH_INTERVAL_MS);
+setInterval(updateFCAS, 300000);
 
 // After first fetch resolves, update derived panels
 fetchLiveData().then(() => {
