@@ -1791,9 +1791,7 @@ document.getElementById('gen-mix').innerHTML =
   '<div style="color:var(--text-dim);font-family:\'IBM Plex Mono\',monospace;font-size:0.75rem;padding:12px 0">Fetching live AEMO data...</div>';
 document.getElementById('curtail').textContent = 'Loading...';
 
-// Frequency is updated via fetchLiveData() — no separate interval needed
 // Fetch live data immediately, then every 5 minutes
-fetchLiveData();
 updateFCAS();
 setInterval(() => {
   fetchLiveData().then(() => {
